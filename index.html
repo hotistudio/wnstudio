@@ -3704,21 +3704,30 @@ function renderSplitContent() {
               <span style="font-weight:700;font-size:13px">${esc(f.name)}</span>
               <span style="font-size:10px;background:var(--teal-light);color:var(--teal);padding:1px 6px;border-radius:10px;margin-left:4px">${f.groupSub || ({'family':'가문','guild':'길드','knight':'기사단','crime_f':'범죄조직','religion':'종교','academic':'학술','politics':'정치','corp':'기업','school':'학교','crime_m':'범죄조직','media':'미디어','military':'군사','politics_m':'정치','korean':'한국풍','chinese':'중국풍','japanese':'일본풍','other':'기타'}[f.groupType||'family']||'가문')}</span>
               ${f.rank?`<span style="font-size:10px;color:var(--muted);margin-left:4px">${esc(f.rank)}</span>`:''}
-              <span style="font-size:10px;color:var(--muted);margin-left:6px">${(f.members||[]).length}명</span>
+              <span style="font-size:10px;color:var(--muted);margin-left:6px">${Object.values(f.groups||{}).reduce((a,g)=>a+(g||[]).length,0)}명</span>
             </div>
             <span style="font-size:11px;color:var(--muted);transform:rotate(${collapsed?'-90':'0'}deg);display:inline-block;transition:transform .2s">▾</span>
           </div>
           ${collapsed ? '' : `
           <div style="padding:8px 12px">
             ${f.description?`<div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.6">${esc(f.description)}</div>`:''}
-            ${(f.members||[]).length===0
-              ? '<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">구성원 없음</div>'
-              : (f.members||[]).map(m=>`
-                <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px">
-                  <span style="font-weight:600">${esc(m.name)}</span>
-                  ${m.relation?`<span style="color:var(--muted)">${esc(m.relation)}</span>`:''}
-                  ${m.note?`<span style="color:var(--teal);font-size:11px">${esc(m.note)}</span>`:''}
-                </div>`).join('')}
+            ${(()=>{
+              const groups = f.groups || {};
+              const allMembers = Object.entries(groups).flatMap(([tab, members]) =>
+                (members||[]).map(m => ({...m, _tab: tab}))
+              );
+              if (!allMembers.length) return '<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">구성원 없음</div>';
+              return Object.entries(groups).filter(([,members])=>(members||[]).length>0).map(([tab, members])=>`
+                <div style="margin-bottom:6px">
+                  <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:4px">${esc(tab)}</div>
+                  ${members.map(m=>`
+                    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px">
+                      <span style="font-weight:600">${esc(m.name)}</span>
+                      ${m.relation?`<span style="color:var(--muted)">${esc(m.relation)}</span>`:''}
+                      ${m.note?`<span style="color:var(--teal);font-size:11px">${esc(m.note)}</span>`:''}
+                    </div>`).join('')}
+                </div>`).join('');
+            })()}
           </div>`}
         </div>`;
       }).join('')}`;
