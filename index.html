@@ -1375,9 +1375,13 @@ function renderPlot() {
   const arcs = p.arcs || [];
 
   const cols = arcs.map((a, ai) => {
-    const scenes = (a.scenes || []).map((s, si) => `
-      <div style="position:relative;margin-bottom:8px">
-        <div class="scene-card" style="margin-bottom:0" onclick="showSceneModal(${ai},${si})">
+  const scenes = (a.scenes || []).map((s, si) => `
+      <div class="scene-row" data-ai="${ai}" data-si="${si}" style="position:relative;margin-bottom:8px">
+        <div class="scene-card" style="margin-bottom:0;padding-left:28px" onclick="showSceneModal(${ai},${si})">
+          <span class="scene-handle" data-ai="${ai}" data-si="${si}"
+            style="position:absolute;left:6px;top:50%;transform:translateY(-50%);
+              color:var(--border);font-size:16px;cursor:grab;padding:4px;
+              touch-action:none;user-select:none;line-height:1">⠿</span>
           <span class="font-display" style="color:var(--gold);font-size:11px">#${si+1}</span>
           <div class="scene-card-title">${esc(s.title)}</div>
           <span class="scene-card-type">${esc(s.type||'')}</span>
@@ -1388,11 +1392,11 @@ function renderPlot() {
             background:rgba(181,69,27,0.12);border:none;cursor:pointer;
             display:flex;align-items:center;justify-content:center;z-index:10;
             color:var(--rust);font-size:13px;font-weight:700;line-height:1"
-          onclick="deleteScene(${ai},${si})">×</button>
+          onclick="event.stopPropagation();deleteScene(${ai},${si})">×</button>
       </div>`).join('');
 
     return `
-      <div class="arc-col">
+      <div class="arc-col" data-ai="${ai}">
         <div class="arc-col-header">
           <span class="arc-col-title">${esc(a.title)}</span>
           <div style="display:flex;gap:4px">
@@ -1425,6 +1429,7 @@ function renderPlot() {
         ? `<div class="card empty-state"><div class="emoji">🗺️</div><p>스토리 아크를 추가하고<br>장면을 구성해보세요.</p></div>`
         : `<div class="arc-list">${cols}</div>`}
     </div>`;
+  setTimeout(initSceneDrag, 50);
 }
 
 function showArcModal(idx) {
@@ -4148,6 +4153,124 @@ function memberDragCommit() {
   setTimeout(initMemberDrag, 50);
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+// 장면(씬) 드래그 앤 드롭 (아크 간 이동 포함)
+// ═══════════════════════════════════════════════════════════════
+let _sDrag = null;
+
+function initSceneDrag() {
+  document.querySelectorAll('.scene-handle').forEach(handle => {
+    handle.addEventListener('touchstart', sceneTouchStart, {passive: false});
+    handle.addEventListener('mousedown', sceneMouseStart);
+  });
+}
+
+function sceneTouchStart(e) {
+  e.preventDefault();
+  const t = e.touches[0];
+  sceneDragInit(e.currentTarget, t.clientX, t.clientY);
+  document.addEventListener('touchmove', sceneTouchMove, {passive: false});
+  document.addEventListener('touchend', sceneTouchEnd, {once: true});
+}
+function sceneMouseStart(e) {
+  sceneDragInit(e.currentTarget, e.clientX, e.clientY);
+  document.addEventListener('mousemove', sceneMouseMove);
+  document.addEventListener('mouseup', sceneMouseEnd, {once: true});
+}
+
+function sceneDragInit(handle, clientX, clientY) {
+  const ai = +handle.dataset.ai;
+  const si = +handle.dataset.si;
+  const row = handle.closest('.scene-row');
+  const rect = row.getBoundingClientRect();
+
+  const title = row.querySelector('.scene-card-title')?.textContent || '';
+  const ghost = document.createElement('div');
+  ghost.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;
+    width:${rect.width}px;height:${rect.height}px;z-index:9999;pointer-events:none;
+    box-shadow:0 4px 16px rgba(0,0,0,.2);border-radius:8px;
+    background:var(--gold-light);border:1.5px solid var(--gold);
+    display:flex;align-items:center;padding:0 12px;gap:8px`;
+  ghost.innerHTML = `<span style="font-size:16px;color:var(--muted)">⠿</span>
+    <span style="font-weight:600;font-size:12px;color:var(--ink)">${title}</span>`;
+  document.body.appendChild(ghost);
+  row.style.opacity = '0.3';
+  _sDrag = { ai, si, el: row, ghost, offsetX: clientX - rect.left, offsetY: clientY - rect.top };
+}
+
+function sceneTouchMove(e) { e.preventDefault(); if (_sDrag) sceneDragMove(e.touches[0].clientX, e.touches[0].clientY); }
+function sceneMouseMove(e) { if (_sDrag) sceneDragMove(e.clientX, e.clientY); }
+
+function sceneDragMove(clientX, clientY) {
+  const { ghost, offsetX, offsetY } = _sDrag;
+  ghost.style.left = (clientX - offsetX) + 'px';
+  ghost.style.top  = (clientY - offsetY) + 'px';
+
+  // 모든 하이라이트 초기화
+  document.querySelectorAll('.scene-row').forEach(r => r.style.borderTop = '');
+  document.querySelectorAll('.arc-col').forEach(c => c.style.outline = '');
+
+  // 현재 커서가 어느 arc-col 위에 있는지
+  const cols = [...document.querySelectorAll('.arc-col')];
+  let targetAi = null;
+  let targetSi = null;
+
+  for (const col of cols) {
+    const colRect = col.getBoundingClientRect();
+    if (clientX >= colRect.left && clientX <= colRect.right &&
+        clientY >= colRect.top  && clientY <= colRect.bottom) {
+      targetAi = +col.dataset.ai;
+      col.style.outline = '2px solid var(--gold)';
+      col.style.borderRadius = '10px';
+
+      // 해당 컬럼 내 scene-row 위치로 삽입 위치 계산
+      const rows = [...col.querySelectorAll('.scene-row')];
+      targetSi = rows.length;
+      for (let i = 0; i < rows.length; i++) {
+        const rRect = rows[i].getBoundingClientRect();
+        if (clientY < rRect.top + rRect.height / 2) {
+          targetSi = i;
+          if (rows[i] !== _sDrag.el) rows[i].style.borderTop = '2px solid var(--gold)';
+          break;
+        }
+      }
+      break;
+    }
+  }
+  _sDrag.targetAi = targetAi;
+  _sDrag.targetSi = targetSi;
+}
+
+function sceneTouchEnd() { document.removeEventListener('touchmove', sceneTouchMove); sceneDragCommit(); }
+function sceneMouseEnd() { document.removeEventListener('mousemove', sceneMouseMove); sceneDragCommit(); }
+
+function sceneDragCommit() {
+  if (!_sDrag) return;
+  const { ai, si, el, ghost, targetAi, targetSi } = _sDrag;
+  _sDrag = null;
+  ghost.remove();
+  el.style.opacity = '';
+  document.querySelectorAll('.scene-row').forEach(r => r.style.borderTop = '');
+  document.querySelectorAll('.arc-col').forEach(c => { c.style.outline = ''; c.style.borderRadius = ''; });
+
+  if (targetAi !== null && targetSi !== null) {
+    const p = getProject();
+    const fromScenes = p.arcs[ai].scenes;
+    const toScenes   = p.arcs[targetAi].scenes;
+    const item = fromScenes.splice(si, 1)[0];
+
+    if (ai === targetAi) {
+      const insertAt = targetSi > si ? targetSi - 1 : targetSi;
+      fromScenes.splice(insertAt, 0, item);
+    } else {
+      toScenes.splice(targetSi, 0, item);
+    }
+    autoSave();
+  }
+  renderPlot();
+  setTimeout(initSceneDrag, 50);
+}
 
 // 가문 유형별 기본 탭 목록
 function getFamilyTabNames(f) {
