@@ -3700,7 +3700,7 @@ function renderSplitContent() {
             onclick="toggleSplitFamily(${fi})">
             <div>
               <span style="font-weight:700;font-size:13px">${esc(f.name)}</span>
-              ${f.groupSub?`<span style="font-size:10px;background:var(--teal-light);color:var(--teal);padding:1px 6px;border-radius:10px;margin-left:4px">${esc(f.groupSub)}</span>`:''}
+              <span style="font-size:10px;background:var(--teal-light);color:var(--teal);padding:1px 6px;border-radius:10px;margin-left:4px">${{'family':'가문','guild':'길드','knight':'기사단','crime_f':'범죄조직','religion':'종교','academic':'학술','politics':'정치','corp':'기업','school':'학교','crime_m':'범죄조직','media':'미디어','military':'군사','politics_m':'정치','korean':'한국풍','chinese':'중국풍','japanese':'일본풍','other':'기타'}[f.groupType||'family']||'가문'}</span>
               ${f.rank?`<span style="font-size:10px;color:var(--muted);margin-left:4px">${esc(f.rank)}</span>`:''}
               <span style="font-size:10px;color:var(--muted);margin-left:6px">${(f.members||[]).length}명</span>
             </div>
@@ -4647,7 +4647,7 @@ function renderFamily() {
             ${isChild?`<span style="font-size:12px;color:${f.color||'var(--gold)'};font-weight:700">└</span>`:''}
             <span style="font-size:11px;color:var(--muted);transition:transform .2s;display:inline-block;transform:rotate(${collapsed?'-90':'0'}deg)">▾</span>
             <span class="font-display" style="font-size:${isChild?'15':'17'}px">${esc(f.name)}</span>
-            ${f.groupSub?`<span class="tag" style="background:var(--teal-light);color:var(--teal);border-color:var(--teal)">${esc(f.groupSub)}</span>`:''}
+            <span class="tag" style="background:var(--teal-light);color:var(--teal);border-color:var(--teal)">${{'family':'가문','guild':'길드','knight':'기사단','crime_f':'범죄조직','religion':'종교','academic':'학술','politics':'정치','corp':'기업','school':'학교','crime_m':'범죄조직','media':'미디어','military':'군사','politics_m':'정치','korean':'한국풍','chinese':'중국풍','japanese':'일본풍','other':'기타'}[f.groupType||'family']||'가문'}</span>
             ${f.rank?`<span class="tag">${esc(f.rank)}</span>`:''}
             ${totalMembers>0?`<span style="font-size:11px;color:var(--muted)">${totalMembers}명</span>`:''}
           </div>
