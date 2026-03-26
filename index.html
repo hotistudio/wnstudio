@@ -472,7 +472,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 <div id="app">
   <!-- HEADER -->
   <header id="header">
-    <button id="header-title" onclick="goHome()">웹소설 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.2.7</span></button>
+    <button id="header-title" onclick="goHome()">웹소설 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.2.8</span></button>
     <button class="header-btn" id="menu-toggle" onclick="toggleSidebar()" style="display:none;padding:6px 8px">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- 왼쪽 세로선 -->
@@ -848,7 +848,7 @@ function renderHome() {
       <div class="home-hero">
         <h1>웹소설 스튜디오</h1>
         <p>아이디어에서 완성작까지 — 당신의 이야기를 완성하세요</p>
-        <span style="font-size:12px;color:var(--border);font-family:'Noto Serif KR',serif;letter-spacing:.5px;font-weight:400;display:block;margin-top:6px">제작자 : 파쿠스티나 with Claude</span>
+        <span style="font-size:12px;color:var(--border);font-family:'Noto Serif KR',serif;letter-spacing:.5px;font-weight:400;display:block;margin-top:6px">제작자 : 호트 with Claude</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -3992,6 +3992,9 @@ function updateFmSubs(typeId, curSub) {
     {id:'media', subs:['방송국','언론사','연예기획사','스포츠팀','광고회사','출판사','영화사']},
     {id:'military', subs:['군대','특수부대','경찰서','정보기관','용병 회사','민간군사기업','자경단']},
     {id:'politics_m', subs:['정당','시민단체','압력단체','로비단체','지하운동','혁명조직','의회파벌']},
+    {id:'korean', subs:['왕실/내명부','의금부/포도청','삼사(사헌부·사간원·홍문관)','훈련도감/어영청','금군/별기군','화랑도','의병단','보부상/객주','향약계/두레','동학교단','불사(절)','무속 집단','권번(기생조합)','의녀 집단','역관 집단','서얼 집단']},
+    {id:'chinese', subs:['정파 문파','사파 문파','마교','검문','도문','권파','황실/조정','내각/어사대','금위군','환관 집단','표국','상회','비밀결사','도방','불문','도관','강호','녹림/흑도']},
+    {id:'japanese', subs:['막부/쇼군','다이묘 가문','사무라이 집단','닌자 조직','로닌 집단','상인 길드(자)','신사/불교 집단','무사도 집단','이세력/반막부','마을 자경단','기녀(게이샤) 집단','학자 집단(난학)']},
     {id:'other', subs:['동호회','동아리','모험가 파티','용사 일행','온라인 커뮤니티','비공개 모임','기타 집단']},
   ];
   const sel = document.getElementById('fm-sub');
@@ -4600,6 +4603,9 @@ function showFamilyModal(idx) {
     {id:'media', label:'미디어/문화 (현대)', subs:['방송국','언론사','연예기획사','스포츠팀','광고회사','출판사','영화사']},
     {id:'military', label:'군사/경찰 (현대)', subs:['군대','특수부대','경찰서','정보기관','용병 회사','민간군사기업','자경단']},
     {id:'politics_m', label:'정치/파벌 (현대)', subs:['정당','시민단체','압력단체','로비단체','지하운동','혁명조직','의회파벌']},
+    {id:'korean', label:'한국풍', subs:['왕실/내명부','의금부/포도청','삼사(사헌부·사간원·홍문관)','훈련도감/어영청','금군/별기군','화랑도','의병단','보부상/객주','향약계/두레','동학교단','불사(절)','무속 집단','권번(기생조합)','의녀 집단','역관 집단','서얼 집단']},
+    {id:'chinese', label:'중국풍 (무협)', subs:['정파 문파','사파 문파','마교','검문','도문','권파','황실/조정','내각/어사대','금위군','환관 집단','표국','상회','비밀결사','도방','불문','도관','강호','녹림/흑도']},
+    {id:'japanese', label:'일본풍', subs:['막부/쇼군','다이묘 가문','사무라이 집단','닌자 조직','로닌 집단','상인 길드(자','신사/불교 집단','무사도 집단','이세력/반막부','마을 자경단','기녀(게이샤) 집단','학자 집단(난학)']},
     {id:'other', label:'기타', subs:['동호회','동아리','모험가 파티','용사 일행','온라인 커뮤니티','비공개 모임','기타 집단']},
   ];
   const curType = f.groupType || 'family';
@@ -4623,7 +4629,7 @@ function showFamilyModal(idx) {
     <div style="margin-bottom:14px"><label class="label">설명</label>
       <textarea id="fm-desc" rows="3" placeholder="역사, 특징, 가훈, 목표 등">${esc(f.description||'')}</textarea></div>
     <div style="margin-bottom:20px">
-      <label class="label">가문 색상</label>
+      <label class="label">색상</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px" id="fm-color-group">
         ${FAMILY_COLORS.map((c,i)=>`
           <button type="button" onclick="selectEdgeOpt('fm-color-group',this,'${c}')"
