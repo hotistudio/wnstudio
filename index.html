@@ -472,7 +472,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 <div id="app">
   <!-- HEADER -->
   <header id="header">
-    <button id="header-title" onclick="goHome()">호트 웹소설 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.3.0</span></button>
+    <button id="header-title" onclick="goHome()">호트 웹소설 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.3.1</span></button>
     <button class="header-btn" id="menu-toggle" onclick="toggleSidebar()" style="display:none;padding:6px 8px">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- 왼쪽 세로선 -->
@@ -849,6 +849,7 @@ function renderHome() {
         <h1>호트 웹소설 스튜디오</h1>
         <p>아이디어에서 완성작까지 — 당신의 이야기를 완성하세요</p>
         <span style="font-size:12px;color:var(--border);font-family:'Noto Serif KR',serif;letter-spacing:.5px;font-weight:400;display:block;margin-top:6px">제작자 : 호트 with Claude</span>
+        <span style="font-size:11px;color:var(--rust);opacity:.7;display:block;margin-top:8px">💾 완전한 저장을 위해 수시로 JSON 백업을 해주세요</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -1288,22 +1289,21 @@ function renderWorld() {
         ${catItems.map(w => {
           const idx = items.findIndex(i => i.id === w.id);
           return `
-          <div class="card card-sm">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
-              <div style="flex:1">
-                <div style="font-weight:700;margin-bottom:6px">${esc(w.title)}</div>
-                <div style="color:var(--muted);font-size:13px;line-height:1.7;white-space:pre-wrap">${esc(w.content)}</div>
-              </div>
-              <div style="display:flex;gap:4px;flex-shrink:0">
-                <button class="btn-icon" onclick="showWorldModal(${idx})">
+          <div class="card card-sm" style="padding:0;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--cream);cursor:pointer;user-select:none" onclick="(function(el){var body=el.parentElement.querySelector('.world-main-body');var arrow=el.querySelector('.world-main-arrow');var isHidden=body.style.display==='none';body.style.display=isHidden?'':'none';arrow.style.transform=isHidden?'rotate(0deg)':'rotate(-90deg)'})(this)">
+              <div style="font-weight:700;font-size:14px">${esc(w.title)}</div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="world-main-arrow" style="color:var(--muted);font-size:10px;transition:transform .2s;display:inline-block">▼</span>
+                <button class="btn-icon" onclick="event.stopPropagation();showWorldModal(${idx})" style="width:28px;height:28px">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 </button>
-                <button onclick="deleteWorld(${idx})" title="삭제"
-                  style="width:30px;height:30px;border-radius:50%;background:rgba(181,69,27,.1);
+                <button onclick="event.stopPropagation();deleteWorld(${idx})" title="삭제"
+                  style="width:28px;height:28px;border-radius:50%;background:rgba(181,69,27,.1);
                     border:none;cursor:pointer;color:var(--rust);font-size:15px;font-weight:700;
                     display:flex;align-items:center;justify-content:center">×</button>
               </div>
             </div>
+            <div class="world-main-body" style="padding:10px 14px;color:var(--muted);font-size:13px;line-height:1.7;white-space:pre-wrap">${esc(w.content)}</div>
           </div>`;
         }).join('')}
       </div>
@@ -3626,11 +3626,14 @@ function renderSplitContent() {
           <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;margin-bottom:6px">${esc(cat)}</div>
           ${items.map(w => `
             <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden;background:var(--white)">
-              <div style="padding:8px 12px;background:var(--cream);display:flex;justify-content:space-between;align-items:center">
+              <div style="padding:8px 12px;background:var(--cream);display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none" onclick="(function(el){var body=el.parentElement.querySelector('.world-card-body');var arrow=el.querySelector('.world-card-arrow');var isHidden=body.style.display==='none';body.style.display=isHidden?'':'none';arrow.style.transform=isHidden?'rotate(0deg)':'rotate(-90deg)'})(this)">
                 <span style="font-weight:700;font-size:13px">${esc(w.title)}</span>
-                <button onclick="showWorldModal(${w._i})" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--teal)">✏️</button>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span class="world-card-arrow" style="color:var(--muted);font-size:10px;transition:transform .2s;display:inline-block">▼</span>
+                  <button onclick="event.stopPropagation();showWorldModal(${w._i})" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--teal)">✏️</button>
+                </div>
               </div>
-              <div style="padding:8px 12px;font-size:12px;color:var(--muted);line-height:1.7;white-space:pre-wrap">${esc(w.content||'')}</div>
+              <div class="world-card-body" style="padding:8px 12px;font-size:12px;color:var(--muted);line-height:1.7;white-space:pre-wrap">${esc(w.content||'')}</div>
             </div>`).join('')}
         </div>`).join('')}`;
 
@@ -4435,9 +4438,7 @@ function renderStorageIndicator() {
       <span style="font-size:11px;color:var(--muted)">${formatBytes(used)} / 10MB</span>
       ${pct > 80 ? '<span style="font-size:11px;color:var(--rust);font-weight:700">⚠️ 용량 부족</span>' : ''}
     </div>
-    <div style="font-size:11px;color:var(--rust);margin-top:5px;opacity:.8">
-      💾 완전한 저장을 위해 수시로 JSON 백업을 해주세요
-    </div>
+
   `;
 }
 
