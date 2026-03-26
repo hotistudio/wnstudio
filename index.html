@@ -4435,6 +4435,9 @@ function renderStorageIndicator() {
       <span style="font-size:11px;color:var(--muted)">${formatBytes(used)} / 10MB</span>
       ${pct > 80 ? '<span style="font-size:11px;color:var(--rust);font-weight:700">⚠️ 용량 부족</span>' : ''}
     </div>
+    <div style="font-size:11px;color:var(--rust);margin-top:5px;opacity:.8">
+      💾 완전한 저장을 위해 수시로 JSON 백업을 해주세요
+    </div>
   `;
 }
 
