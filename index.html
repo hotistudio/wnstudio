@@ -472,7 +472,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 <div id="app">
   <!-- HEADER -->
   <header id="header">
-    <button id="header-title" onclick="goHome()">웹소설 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.2.8</span></button>
+    <button id="header-title" onclick="goHome()">웹소설 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.2.9</span></button>
     <button class="header-btn" id="menu-toggle" onclick="toggleSidebar()" style="display:none;padding:6px 8px">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- 왼쪽 세로선 -->
@@ -4212,6 +4212,23 @@ function setFamilyTab(fi, tab) {
   renderFamily();
 }
 
+
+function moveFamilyCard(fi, dir) {
+  const p = getProject();
+  const families = p.families;
+  // 부모 없는 카드만 이동
+  const roots = families.map((f,i)=>({f,i})).filter(({f})=>!f.parentName);
+  const rootIdx = roots.findIndex(({i})=>i===fi);
+  if (rootIdx === -1) return;
+  const newRootIdx = rootIdx + dir;
+  if (newRootIdx < 0 || newRootIdx >= roots.length) return;
+  // swap
+  const a = roots[rootIdx].i;
+  const b = roots[newRootIdx].i;
+  [families[a], families[b]] = [families[b], families[a]];
+  autoSave(); renderFamily();
+}
+
 // ═══════════════════════════════════════════════════════════════
 // MODAL SYSTEM
 // ═══════════════════════════════════════════════════════════════
@@ -4681,6 +4698,11 @@ function showFamilyModal(idx) {
         ${curTypeSubs.map(s=>`<option value="${s}" ${curSub===s?'selected':''}>${s}</option>`).join('')}
       </select>
     </div>
+    <div style="margin-bottom:12px"><label class="label">상위 가문/집단 (선택)</label>
+      <select id="fm-parent">
+        <option value="">없음 (독립)</option>
+        ${(p.families||[]).filter((_,i)=>i!==(idx)).map((pf,pi)=>`<option value="${esc(pf.name)}" ${(f.parentName===pf.name)?'selected':''}>${esc(pf.name)}</option>`).join('')}
+      </select></div>
     <div style="margin-bottom:12px"><label class="label">등급/직위</label>
       <input id="fm-rank" value="${esc(f.rank||'')}" placeholder="예: 공작가, 1등급, 최상위"></div>
     <div style="margin-bottom:14px"><label class="label">설명</label>
@@ -4711,6 +4733,7 @@ function saveFamily(idx) {
   const f = {
     id: idx!==undefined ? p.families[idx].id : uid(),
     name,
+    parentName: document.getElementById('fm-parent')?.value || '',
     groupType: document.getElementById('fm-type')?.value || 'family',
     groupSub: document.getElementById('fm-sub')?.value || '',
     rank: document.getElementById('fm-rank').value,
@@ -4737,12 +4760,30 @@ function showAddMemberModal(fi) {
   const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
   showModal(`
     <div class="modal-title">${tab} 구성원 추가</div>
-    <div style="margin-bottom:12px"><label class="label">이름 *</label>
-      <input id="mb-name" placeholder="예: 아르켄 레온하르트"></div>
-    <div style="margin-bottom:12px"><label class="label">관계/직위</label>
-      <input id="mb-relation" placeholder="예: 가주, 장남, 3세"></div>
-    <div style="margin-bottom:20px"><label class="label">비고</label>
-      <input id="mb-note" placeholder="예: 현재 실종, 마법 능력 보유"></div>
+    <div class="form-grid">
+      <div class="full"><label class="label">이름 *</label>
+        <input id="mb-name" placeholder="예: 아르켄 레온하르트"></div>
+      <div><label class="label">나이</label>
+        <input id="mb-age" placeholder="예: 24" type="number" min="0"></div>
+      <div><label class="label">성별</label>
+        <select id="mb-gender">
+          <option value="">미지정</option>
+          <option value="남">남성</option>
+          <option value="여">여성</option>
+          <option value="기타">기타</option>
+        </select></div>
+      <div><label class="label">생사 여부</label>
+        <select id="mb-alive">
+          <option value="생존">생존</option>
+          <option value="사망">사망</option>
+          <option value="불명">불명</option>
+          <option value="불사">불사/불멸</option>
+        </select></div>
+      <div><label class="label">관계/직위</label>
+        <input id="mb-relation" placeholder="예: 가주, 장남, 3세"></div>
+      <div class="full"><label class="label">비고</label>
+        <input id="mb-note" placeholder="예: 현재 실종, 마법 능력 보유"></div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
       <button class="btn btn-gold" onclick="saveFamilyMember(${fi})">추가</button>
@@ -4758,12 +4799,30 @@ function showEditMemberModal(fi, mi) {
   if (!m) return;
   showModal(`
     <div class="modal-title">구성원 수정</div>
-    <div style="margin-bottom:12px"><label class="label">이름 *</label>
-      <input id="mb-name" value="${esc(m.name||'')}" placeholder="예: 아르켄 레온하르트"></div>
-    <div style="margin-bottom:12px"><label class="label">관계/직위</label>
-      <input id="mb-relation" value="${esc(m.relation||'')}" placeholder="예: 가주, 장남, 3세"></div>
-    <div style="margin-bottom:20px"><label class="label">비고</label>
-      <input id="mb-note" value="${esc(m.note||'')}" placeholder="예: 현재 실종, 마법 능력 보유"></div>
+    <div class="form-grid">
+      <div class="full"><label class="label">이름 *</label>
+        <input id="mb-name" value="${esc(m.name||'')}" placeholder="예: 아르켄 레온하르트"></div>
+      <div><label class="label">나이</label>
+        <input id="mb-age" value="${esc(m.age||'')}" placeholder="예: 24" type="number" min="0"></div>
+      <div><label class="label">성별</label>
+        <select id="mb-gender">
+          <option value="" ${!m.gender?'selected':''}>미지정</option>
+          <option value="남" ${ m.gender==='남'?'selected':''}>남성</option>
+          <option value="여" ${ m.gender==='여'?'selected':''}>여성</option>
+          <option value="기타" ${ m.gender==='기타'?'selected':''}>기타</option>
+        </select></div>
+      <div><label class="label">생사 여부</label>
+        <select id="mb-alive">
+          <option value="생존" ${(m.alive||'생존')==='생존'?'selected':''}>생존</option>
+          <option value="사망" ${ m.alive==='사망'?'selected':''}>사망</option>
+          <option value="불명" ${ m.alive==='불명'?'selected':''}>불명</option>
+          <option value="불사" ${ m.alive==='불사'?'selected':''}>불사/불멸</option>
+        </select></div>
+      <div><label class="label">관계/직위</label>
+        <input id="mb-relation" value="${esc(m.relation||'')}" placeholder="예: 가주, 장남, 3세"></div>
+      <div class="full"><label class="label">비고</label>
+        <input id="mb-note" value="${esc(m.note||'')}" placeholder="예: 현재 실종, 마법 능력 보유"></div>
+    </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
       <button class="btn btn-gold" onclick="updateFamilyMember(${fi},${mi})">저장</button>
@@ -4781,6 +4840,9 @@ function updateFamilyMember(fi, mi) {
   f.groups[tab][mi] = {
     ...f.groups[tab][mi],
     name,
+    age: document.getElementById('mb-age')?.value || '',
+    gender: document.getElementById('mb-gender')?.value || '',
+    alive: document.getElementById('mb-alive')?.value || '생존',
     relation: document.getElementById('mb-relation').value,
     note: document.getElementById('mb-note').value,
   };
@@ -4798,6 +4860,9 @@ function saveFamilyMember(fi) {
   if (!f.groups[tab]) f.groups[tab] = [];
   f.groups[tab].push({
     name,
+    age: document.getElementById('mb-age')?.value || '',
+    gender: document.getElementById('mb-gender')?.value || '',
+    alive: document.getElementById('mb-alive')?.value || '생존',
     relation: document.getElementById('mb-relation').value,
     note: document.getElementById('mb-note').value,
   });
