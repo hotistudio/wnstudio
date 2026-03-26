@@ -4121,7 +4121,9 @@ function memberDragCommit() {
 
   if (targetIdx !== undefined && targetIdx !== mi && targetIdx !== mi + 1) {
     const p = getProject();
-    const members = p.families[fi].members;
+    const f = p.families[fi];
+    const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+    const members = (f.groups && f.groups[tab]) || [];
     const item = members.splice(mi, 1)[0];
     const insertAt = targetIdx > mi ? targetIdx - 1 : targetIdx;
     members.splice(insertAt, 0, item);
@@ -4130,6 +4132,84 @@ function memberDragCommit() {
   renderFamily();
   // 드래그 이벤트 재등록
   setTimeout(initMemberDrag, 50);
+}
+
+
+// 가문 유형별 기본 탭 목록
+function getFamilyTabNames(f) {
+  const type = f.groupType || 'family';
+  const tabMap = {
+    family: ['직계','방계','사용인','동맹 가문'],
+    guild: ['핵심 멤버','일반 멤버','수습'],
+    knight: ['기사','병사','지원'],
+    crime_f: ['간부','조원','협력자'],
+    religion: ['성직자','신도','수련자'],
+    academic: ['연구원','학생','자문'],
+    politics: ['핵심 세력','지지자','협력자'],
+    corp: ['임원','직원','파트너'],
+    school: ['교직원','재학생','동문'],
+    crime_m: ['간부','조원','협력자'],
+    media: ['핵심 인물','구성원','관계자'],
+    military: ['지휘관','병사','지원'],
+    politics_m: ['핵심 당원','일반 당원','지지자'],
+    korean: ['직계','방계','사용인','동맹'],
+    chinese: ['장로','제자','협력자'],
+    japanese: ['핵심','일반','수련생'],
+    other: ['핵심','일반','기타'],
+  };
+  return tabMap[type] || ['핵심','일반','기타'];
+}
+
+function renderFamilyTabs(f, fi) {
+  const tabs = getFamilyTabNames(f);
+  const groups = f.groups || {};
+  const activeTab = familyActiveTab['f'+fi] || tabs[0];
+  const members = groups[activeTab] || [];
+  const totalCount = tabs.reduce((acc, t) => acc + (groups[t]||[]).length, 0);
+
+  const tabBtns = tabs.map(t => {
+    const cnt = (groups[t]||[]).length;
+    const active = t === activeTab;
+    return `<button onclick="setFamilyTab(${fi},'${t}')"
+      style="padding:5px 12px;border:none;border-radius:20px;cursor:pointer;font-size:11px;
+        font-family:'Noto Sans KR',sans-serif;font-weight:600;transition:all .15s;
+        background:${active?'var(--gold)':'var(--cream)'};
+        color:${active?'#fff':'var(--muted)'}">
+      ${t}${cnt>0?` <span style="opacity:.8">(${cnt})</span>`:''}
+    </button>`;
+  }).join('');
+
+  const memberRows = members.map((m, mi) => `
+    <div class="member-row" data-fi="${fi}" data-mi="${mi}"
+      style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--cream);border-radius:8px;transition:opacity .15s">
+      <span class="member-handle" data-fi="${fi}" data-mi="${mi}"
+        style="color:var(--muted);font-size:18px;flex-shrink:0;cursor:grab;padding:4px;touch-action:none;user-select:none">⠿</span>
+      <div style="flex:1;min-width:0">
+        <span style="font-weight:600;font-size:13px">${esc(m.name)}</span>
+        ${m.relation?`<span style="font-size:11px;color:var(--muted);margin-left:6px">${esc(m.relation)}</span>`:''}
+      </div>
+      ${m.note?`<span style="font-size:11px;color:var(--muted);flex-shrink:0">${esc(m.note)}</span>`:''}
+      <button onclick="showEditMemberModal(${fi},${mi})" style="background:none;border:none;cursor:pointer;color:var(--teal);font-size:13px;width:28px;height:28px;flex-shrink:0">✏️</button>
+      <button onclick="deleteFamilyMember(${fi},${mi})" style="background:none;border:none;cursor:pointer;color:var(--rust);font-size:14px;width:28px;height:28px;flex-shrink:0">×</button>
+    </div>`).join('');
+
+  return `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      ${tabBtns}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;min-height:10px" id="member-list-${fi}">
+      ${members.length===0
+        ? `<div style="text-align:center;padding:12px;font-size:12px;color:var(--muted)">구성원 없음</div>`
+        : memberRows}
+    </div>
+    <button class="btn btn-outline btn-sm" style="margin-top:8px;width:100%;justify-content:center"
+      onclick="showAddMemberModal(${fi})">＋ ${activeTab} 구성원 추가</button>`;
+}
+
+let familyActiveTab = {};
+function setFamilyTab(fi, tab) {
+  familyActiveTab['f'+fi] = tab;
+  renderFamily();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -4542,32 +4622,9 @@ function renderFamily() {
           </div>
         </div>
         ${f.description?`<div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.7">${esc(f.description)}</div>`:''}
-        ${f.members&&f.members.length>0?`
-          <div style="border-top:1px solid var(--border);padding-top:10px">
-            <div style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:8px;user-select:none"
-              onclick="toggleFamilyMembers(${fi})">
-              <span style="font-size:10px;color:var(--muted);display:inline-block;transition:transform .2s;transform:rotate(${familyMemberCollapsed['f'+fi]?'-90':'0'}deg)">▾</span>
-              <span style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px">구성원 (${f.members.length}명)</span>
-            </div>
-            ${familyMemberCollapsed['f'+fi]?'':`
-            <div style="display:flex;flex-direction:column;gap:4px" id="member-list-${fi}">
-              ${f.members.map((m,mi)=>`
-                <div class="member-row" data-fi="${fi}" data-mi="${mi}"
-                  style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--cream);border-radius:8px;transition:opacity .15s">
-                  <span class="member-handle" data-fi="${fi}" data-mi="${mi}"
-                    style="color:var(--muted);font-size:18px;flex-shrink:0;cursor:grab;padding:4px;touch-action:none;user-select:none">⠿</span>
-                  <div style="flex:1;min-width:0">
-                    <span style="font-weight:600;font-size:13px">${esc(m.name)}</span>
-                    ${m.relation?`<span style="font-size:11px;color:var(--muted);margin-left:6px">${esc(m.relation)}</span>`:''}
-                  </div>
-                  ${m.note?`<span style="font-size:11px;color:var(--muted);flex-shrink:0">${esc(m.note)}</span>`:''}
-                  <button onclick="showEditMemberModal(${fi},${mi})" style="background:none;border:none;cursor:pointer;color:var(--teal);font-size:13px;width:28px;height:28px;flex-shrink:0">✏️</button>
-                  <button onclick="deleteFamilyMember(${fi},${mi})" style="background:none;border:none;cursor:pointer;color:var(--rust);font-size:14px;width:28px;height:28px;flex-shrink:0">×</button>
-                </div>`).join('')}
-            </div>`}
-          </div>`:''}
-        <button class="btn btn-outline btn-sm" style="margin-top:10px;width:100%;justify-content:center"
-          onclick="showAddMemberModal(${fi})">＋ 구성원 추가</button>
+        <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+          ${renderFamilyTabs(f, fi)}
+        </div>
       </div>`).join('');
 
   document.getElementById('main').innerHTML = `
@@ -4675,12 +4732,15 @@ function deleteFamily(idx) {
 }
 
 function showAddMemberModal(fi) {
+  const p = getProject();
+  const f = p.families[fi];
+  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
   showModal(`
-    <div class="modal-title">구성원 추가</div>
+    <div class="modal-title">${tab} 구성원 추가</div>
     <div style="margin-bottom:12px"><label class="label">이름 *</label>
       <input id="mb-name" placeholder="예: 아르켄 레온하르트"></div>
     <div style="margin-bottom:12px"><label class="label">관계/직위</label>
-      <input id="mb-relation" placeholder="예: 가주, 장남, 방계 3세"></div>
+      <input id="mb-relation" placeholder="예: 가주, 장남, 3세"></div>
     <div style="margin-bottom:20px"><label class="label">비고</label>
       <input id="mb-note" placeholder="예: 현재 실종, 마법 능력 보유"></div>
     <div class="modal-footer">
@@ -4692,14 +4752,16 @@ function showAddMemberModal(fi) {
 
 function showEditMemberModal(fi, mi) {
   const p = getProject();
-  const m = p.families[fi].members[mi];
+  const f = p.families[fi];
+  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+  const m = (f.groups && f.groups[tab]) ? f.groups[tab][mi] : null;
   if (!m) return;
   showModal(`
     <div class="modal-title">구성원 수정</div>
     <div style="margin-bottom:12px"><label class="label">이름 *</label>
       <input id="mb-name" value="${esc(m.name||'')}" placeholder="예: 아르켄 레온하르트"></div>
     <div style="margin-bottom:12px"><label class="label">관계/직위</label>
-      <input id="mb-relation" value="${esc(m.relation||'')}" placeholder="예: 가주, 장남, 방계 3세"></div>
+      <input id="mb-relation" value="${esc(m.relation||'')}" placeholder="예: 가주, 장남, 3세"></div>
     <div style="margin-bottom:20px"><label class="label">비고</label>
       <input id="mb-note" value="${esc(m.note||'')}" placeholder="예: 현재 실종, 마법 능력 보유"></div>
     <div class="modal-footer">
@@ -4713,8 +4775,11 @@ function updateFamilyMember(fi, mi) {
   const name = document.getElementById('mb-name').value.trim();
   if (!name) { toast('이름을 입력해주세요.'); return; }
   const p = getProject();
-  p.families[fi].members[mi] = {
-    ...p.families[fi].members[mi],
+  const f = p.families[fi];
+  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+  if (!f.groups || !f.groups[tab]) return;
+  f.groups[tab][mi] = {
+    ...f.groups[tab][mi],
     name,
     relation: document.getElementById('mb-relation').value,
     note: document.getElementById('mb-note').value,
@@ -4727,8 +4792,11 @@ function saveFamilyMember(fi) {
   const name = document.getElementById('mb-name').value.trim();
   if (!name) { toast('이름을 입력해주세요.'); return; }
   const p = getProject();
-  if (!p.families[fi].members) p.families[fi].members = [];
-  p.families[fi].members.push({
+  const f = p.families[fi];
+  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+  if (!f.groups) f.groups = {};
+  if (!f.groups[tab]) f.groups[tab] = [];
+  f.groups[tab].push({
     name,
     relation: document.getElementById('mb-relation').value,
     note: document.getElementById('mb-note').value,
@@ -4737,7 +4805,12 @@ function saveFamilyMember(fi) {
 }
 
 function deleteFamilyMember(fi, mi) {
-  getProject().families[fi].members.splice(mi,1);
+  const p = getProject();
+  const f = p.families[fi];
+  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+  if (f.groups && f.groups[tab]) {
+    f.groups[tab].splice(mi, 1);
+  }
   autoSave(); renderFamily();
   toast('구성원을 삭제했어요.');
 }
