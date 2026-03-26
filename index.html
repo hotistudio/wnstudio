@@ -690,6 +690,7 @@ function goHome() {
   document.getElementById('btn-import').style.display = 'none';
   document.getElementById('main').classList.remove('no-pad');
   closeSidebar();
+  history.pushState({screen:'home'}, '');
   renderHome();
 }
 
@@ -705,6 +706,7 @@ function openProject(id) {
   document.getElementById('btn-import').style.display = 'inline-flex';
   document.getElementById('sidebar-project-title').textContent = p.title || '제목 없음';
   document.getElementById('sidebar-project-status').innerHTML = statusBadge(p.status);
+  history.pushState({screen:'project', id}, '');
   navigate('overview');
 }
 
@@ -717,6 +719,7 @@ function navigate(tab) {
   document.getElementById('main').classList.toggle('no-pad', tab === 'chapters');
   closeSidebar();
   updateBadges();
+  history.pushState({screen:'tab', tab, id: state.activeProjectId}, '');
   const renders = {
     overview: renderOverview,
     characters: renderCharacters,
@@ -4933,7 +4936,20 @@ loadFromStorage();
 initDarkMode();
 applyEditorFontSize();
 renderHome();
+history.replaceState({screen:'home'}, '');
 setTimeout(() => { updateFsStatus(); tryAutoReconnect(); }, 300);
+
+// 뒤로가기 처리
+window.addEventListener('popstate', e => {
+  const s = e.state;
+  if (!s) { history.pushState({screen:'home'}, ''); goHome(); return; }
+  if (s.screen === 'home') { goHome(); }
+  else if (s.screen === 'project') { openProject(s.id); }
+  else if (s.screen === 'tab') {
+    if (s.id && s.id !== state.activeProjectId) openProject(s.id);
+    else navigate(s.tab);
+  }
+});
 
 // PWA Service Worker 등록
 if ('serviceWorker' in navigator) {
