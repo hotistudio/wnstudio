@@ -4286,7 +4286,7 @@ function renderSplitContent() {
       </div>
       ${chars.map((c,i) => {
         const bg = c.color || (c.group ? getGroupColor(c.group) : 'var(--white)');
-        const collapsed = splitCharCollapsed['c'+i];
+        const collapsed = splitCharCollapsed['c'+i] !== false ? true : false; // 기본 접힘
         return `
         <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;background:${bg}">
           <div style="padding:8px 12px;background:rgba(0,0,0,.04);display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer"
@@ -4328,15 +4328,18 @@ function renderSplitContent() {
       </div>`;
       return;
     }
-    el.innerHTML = arcs.map((a,ai) => `
+    if (!window._spArcCol) window._spArcCol = {};
+    el.innerHTML = arcs.map((a,ai) => {
+      const col = window._spArcCol[ai] !== false ? true : false; // 기본 접힘
+      return `
       <div style="margin-bottom:10px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
         <div style="display:flex;align-items:center;justify-content:space-between;
           padding:8px 12px;background:var(--gold-light);cursor:pointer;user-select:none"
-          onclick="(function(el){var body=el.parentElement.querySelector('.split-arc-body');var arrow=el.querySelector('.split-arc-arrow');var isHidden=body.style.display==='none';body.style.display=isHidden?'':'none';arrow.style.transform=isHidden?'rotate(0deg)':'rotate(-90deg)'})(this)">
+          onclick="window._spArcCol[${ai}]=!window._spArcCol[${ai}];refreshSplitPanel()">
           <span style="font-weight:700;font-size:13px;color:var(--gold)">${esc(a.title)}</span>
-          <span class="split-arc-arrow" style="color:var(--gold);font-size:10px;transition:transform .2s;display:inline-block">▼</span>
+          <span style="color:var(--gold);font-size:10px;transition:transform .2s;display:inline-block;transform:rotate(${col?'-90':'0'}deg)">▼</span>
         </div>
-        <div class="split-arc-body" style="padding:8px 10px">
+        ${col ? '' : `<div style="padding:8px 10px">
           ${(a.scenes||[]).length === 0
             ? `<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">장면 없음</div>`
             : (a.scenes||[]).map((s,si) => `
@@ -4344,8 +4347,9 @@ function renderSplitContent() {
                 <div style="font-size:12px;font-weight:600;margin-bottom:4px"><span style="color:var(--muted)">#${si+1}</span> ${esc(s.title)}</div>
                 ${s.summary ? `<div style="font-size:11px;color:var(--muted);line-height:1.6">${esc(s.summary)}</div>` : ''}
               </div>`).join('')}
-        </div>
-      </div>`).join('');
+        </div>`}
+      </div>`;
+    }).join('');
 
   } else if (splitTab === 'world') {
     const worlds = p.worldSettings || [];
@@ -4366,6 +4370,7 @@ function renderSplitContent() {
     // 장르 카테고리 순서대로 정렬
     const orderedCats = [...getWorldCats(p.genre), ...Object.keys(groups).filter(c => !getWorldCats(p.genre).includes(c))];
     const sortedGroups = orderedCats.filter(c => groups[c]).map(c => [c, groups[c]]);
+    if (!window._spWorldCol) window._spWorldCol = {};
     el.innerHTML = `
       <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
         <button class="btn btn-gold btn-sm" onclick="showWorldModal()">＋ 추가</button>
@@ -4373,17 +4378,21 @@ function renderSplitContent() {
       ${sortedGroups.map(([cat, items]) => `
         <div style="margin-bottom:16px">
           <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;margin-bottom:6px">${esc(cat)}</div>
-          ${items.map(w => `
+          ${items.map(w => {
+            const col = window._spWorldCol[w._i] !== false ? true : false; // 기본 접힘
+            return `
             <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden;background:var(--white)">
-              <div style="padding:8px 12px;background:var(--cream);display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none" onclick="(function(el){var body=el.parentElement.querySelector('.world-card-body');var arrow=el.querySelector('.world-card-arrow');var isHidden=body.style.display==='none';body.style.display=isHidden?'':'none';arrow.style.transform=isHidden?'rotate(0deg)':'rotate(-90deg)'})(this)">
+              <div style="padding:8px 12px;background:var(--cream);display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none"
+                onclick="window._spWorldCol[${w._i}]=!window._spWorldCol[${w._i}];refreshSplitPanel()">
                 <span style="font-weight:700;font-size:13px">${esc(w.title)}</span>
                 <div style="display:flex;align-items:center;gap:6px">
-                  <span class="world-card-arrow" style="color:var(--muted);font-size:10px;transition:transform .2s;display:inline-block">▼</span>
+                  <span style="color:var(--muted);font-size:10px;transition:transform .2s;display:inline-block;transform:rotate(${col?'-90':'0'}deg)">▼</span>
                   <button onclick="event.stopPropagation();showWorldModal(${w._i})" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--teal)">✏️</button>
                 </div>
               </div>
-              <div class="world-card-body" style="padding:8px 12px;font-size:12px;color:var(--muted);line-height:1.7;white-space:pre-wrap">${esc(w.content||'')}</div>
-            </div>`).join('')}
+              ${col ? '' : `<div style="padding:8px 12px;font-size:12px;color:var(--muted);line-height:1.7;white-space:pre-wrap">${esc(w.content||'')}</div>`}
+            </div>`;
+          }).join('')}
         </div>`).join('')}`;
 
   } else if (splitTab === 'relations') {
@@ -4490,7 +4499,7 @@ function renderSplitContent() {
       + (items.length === 0
         ? '<div style="color:var(--muted);text-align:center;padding:30px 0;font-size:13px">아이템이 없어요</div>'
         : catGroups.map(({cat, list}) => {
-            const col = window._splitItemCollapsed[cat];
+            const col = window._splitItemCollapsed[cat] !== false ? true : false; // 기본 접힘
             let html = '<div style="margin-bottom:8px">'
               + '<div onclick="window._splitItemCollapsed[\''+cat+'\']'
               + '=!window._splitItemCollapsed[\''+cat+'\'];refreshSplitPanel()"'
@@ -4524,6 +4533,7 @@ function renderSplitContent() {
 
   } else if (splitTab === 'memo') {
     const memos = getChapterMemos();
+    if (!window._spMemoCol) window._spMemoCol = {};
     el.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <span style="font-size:12px;font-weight:700;color:var(--muted)">메모 (${memos.length})</span>
@@ -4531,21 +4541,34 @@ function renderSplitContent() {
       </div>
       ${memos.length === 0
         ? '<div style="color:var(--muted);text-align:center;padding:30px 0;font-size:13px">＋ 추가 버튼으로 메모를 만들어보세요</div>'
-        : memos.map((m,i) => `
-          <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;background:${m.color||'#fff8e1'}">
-            <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid rgba(0,0,0,.06)">
-              <input value="${esc(m.title||'')}" oninput="updateChapterMemoTitle(${i},this.value)"
-                placeholder="제목 (선택)"
-                style="flex:1;border:none;outline:none;background:transparent;font-weight:700;font-size:13px;color:#1a1208">
-              <button onclick="deleteChapterMemo(${i})"
+        : memos.map((m,i) => {
+            const col = window._spMemoCol[i] !== false ? true : false; // 기본 접힘
+            return `
+          <div style="border:1px solid rgba(0,0,0,.1);border-radius:10px;margin-bottom:8px;overflow:hidden;background:${m.color||'#fff8e1'}">
+            <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;user-select:none"
+              onclick="window._spMemoCol[${i}]=!window._spMemoCol[${i}];refreshSplitPanel()">
+              <span style="flex:1;font-weight:700;font-size:13px;color:#1a1208;
+                overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                ${m.title ? esc(m.title) : '<span style="opacity:.4">제목 없음</span>'}
+              </span>
+              <span style="font-size:10px;color:rgba(0,0,0,.3);transition:transform .2s;display:inline-block;
+                transform:rotate(${col?'-90':'0'}deg);flex-shrink:0">▾</span>
+              <button onclick="event.stopPropagation();deleteChapterMemo(${i})"
                 style="background:none;border:none;cursor:pointer;font-size:13px;color:#b5451b;flex-shrink:0">✕</button>
             </div>
-            <textarea oninput="updateChapterMemoText(${i},this.value)" rows="4"
-              placeholder="메모를 입력하세요..."
-              style="width:100%;padding:10px 12px;font-size:13px;line-height:1.8;
-                background:transparent;border:none;outline:none;resize:vertical;
-                font-family:'Noto Serif KR',serif;color:#1a1208">${esc(m.content||'')}</textarea>
-          </div>`).join('')}
+            ${col ? '' : `
+            <div style="border-top:1px solid rgba(0,0,0,.06)">
+              <input value="${esc(m.title||'')}" oninput="updateChapterMemoTitle(${i},this.value)"
+                placeholder="제목 (선택)"
+                style="width:100%;padding:6px 10px;border:none;outline:none;background:transparent;
+                  font-weight:700;font-size:12px;color:#1a1208;border-bottom:1px solid rgba(0,0,0,.06)">
+              <textarea oninput="updateChapterMemoText(${i},this.value)" rows="4"
+                placeholder="메모를 입력하세요..."
+                style="width:100%;padding:8px 10px;font-size:12px;line-height:1.8;
+                  background:transparent;border:none;outline:none;resize:vertical;
+                  font-family:'Noto Serif KR',serif;color:#1a1208">${esc(m.content||'')}</textarea>
+            </div>`}
+          </div>`;}).join('')}
     `;
   }
 }
