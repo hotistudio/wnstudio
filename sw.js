@@ -1,5 +1,5 @@
-// wnstudio sw.js - updated: 1774602692
-const CACHE = 'wnstudio-1774602692';
+// wnstudio sw.js - updated: 1774603038
+const CACHE = 'wnstudio-1774603038';
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(cache => cache.addAll(['/wnstudio/', '/wnstudio/index.html']))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))); self.clients.claim(); });
 self.addEventListener('fetch', e => { if(e.request.method!=='GET') return; e.respondWith(fetch(e.request,{cache:'no-cache'}).then(res => { if(res&&res.status===200){const clone=res.clone();caches.open(CACHE).then(cache=>cache.put(e.request,clone));} return res; }).catch(()=>caches.match(e.request))); });
