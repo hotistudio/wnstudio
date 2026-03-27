@@ -5209,19 +5209,24 @@ function renderStats() {
   // 히트맵 (8주)
   const weeks = 12;
   const days = weeks * 7;
-  const calStart = new Date();
-  calStart.setDate(calStart.getDate() - days + 1);
   const maxVal = Math.max(...Object.values(pStats).filter(v => v > 0), 1);
   const colors = ['var(--cream)','#c6e48b','#7bc96f','#239a3b','#196127'];
-  let calCells = '';
-  for (let i = 0; i < days; i++) {
-    const dd = new Date(calStart);
-    dd.setDate(calStart.getDate() + i);
-    const key = dd.toISOString().slice(0, 10);
-    const val = pStats[key] || 0;
-    const intensity = val === 0 ? 0 : Math.ceil((val / maxVal) * 4);
-    const isToday = key === today;
-    calCells += `<div title="${key}: ${val.toLocaleString()}자" style="width:16px;height:16px;border-radius:3px;background:${colors[intensity]};${isToday?'outline:2px solid var(--gold);outline-offset:1px':''}"></div>`;
+  // 7행 × 12열 — 오늘(왼위), 아래로 날짜 증가, 열 넘어가면 다음 열
+  // col=0,row=0 → 오늘, col=0,row=1 → 1일 후, col=1,row=0 → 7일 후
+  let calRows = '';
+  for (let row = 0; row < 7; row++) {
+    let rowHtml = '';
+    for (let col = 0; col < weeks; col++) {
+      const idx = col * 7 + row;
+      const dd = new Date();
+      dd.setDate(dd.getDate() + idx);
+      const key = dd.toISOString().slice(0, 10);
+      const val = pStats[key] || 0;
+      const intensity = val === 0 ? 0 : Math.ceil((val / maxVal) * 4);
+      const isToday = key === today;
+      rowHtml += `<div title="${key}: ${val.toLocaleString()}자" style="width:16px;height:16px;border-radius:3px;background:${colors[intensity]};${isToday?'outline:2px solid var(--gold);outline-offset:1px':''}"></div>`;
+    }
+    calRows += `<div style="display:flex;gap:3px">${rowHtml}</div>`;
   }
 
   // 월별 통계 (2026년 3월부터 현재까지)
@@ -5304,8 +5309,8 @@ function renderStats() {
           <!-- 달력 히트맵 -->
           <div>
             <div style="font-weight:700;font-size:12px;margin-bottom:10px;color:var(--muted)">📅 최근 ${weeks}주</div>
-            <div style="display:grid;grid-template-columns:repeat(${weeks},16px);gap:3px">
-              ${calCells}
+            <div style="display:flex;flex-direction:column;gap:3px">
+              ${calRows}
             </div>
             <div style="display:flex;align-items:center;gap:4px;margin-top:8px">
               <span style="font-size:10px;color:var(--muted)">적음</span>
