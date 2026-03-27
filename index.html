@@ -459,6 +459,8 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
   .home-hero h1{font-size:24px}
   .arc-list{flex-direction:column}
   .arc-col{min-width:unset;max-width:unset}
+  .psy-arc-list{flex-direction:row !important}
+  .psy-arc-list .arc-col{min-width:200px !important;max-width:200px !important}
   #header-project{display:none}
 }
 @media(min-width:769px) and (max-width:1024px){
@@ -525,6 +527,10 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           가문 및 집단
         </button>
+        <button class="nav-item" onclick="navigate('psyarc')" data-tab="psyarc">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          심리 아크 <span class="nav-badge" id="badge-psyarc"></span>
+        </button>
         <div class="nav-section">세계관</div>
         <button class="nav-item" onclick="navigate('world')" data-tab="world">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -542,7 +548,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
         <div class="nav-section">시각화</div>
         <button class="nav-item" onclick="navigate('diagram')" data-tab="diagram">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="12" y1="14" x2="5" y2="16"/><line x1="12" y1="14" x2="19" y2="16"/></svg>
-          다이어그램
+          다이어그램 <span style="font-size:9px;font-weight:700;background:var(--teal);color:#fff;padding:1px 5px;border-radius:4px;letter-spacing:.3px;vertical-align:middle">BETA</span>
         </button>
         <div class="nav-section">메모</div>
         <button class="nav-item" onclick="navigate('memo')" data-tab="memo">
@@ -731,6 +737,7 @@ function navigate(tab) {
     manuscript: renderManuscript,
     memo: renderMemo,
     family: renderFamily,
+    psyarc: renderPsyArc,
   };
 
   if (renders[tab]) renders[tab]();
@@ -781,6 +788,7 @@ function updateBadges() {
     world: (p.worldSettings||[]).length,
     plot: (p.arcs||[]).length,
     chapters: (p.chapters||[]).length,
+    psyarc: (p.psyArcs||[]).length,
   };
   Object.entries(b).forEach(([k,v]) => {
     const el = document.getElementById('badge-'+k);
@@ -4790,6 +4798,186 @@ function showGroupColorPicker(groupName, btnEl) {
 // ═══════════════════════════════════════════════════════════
 // 가문 (FAMILY)
 // ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// 심리 아크
+// ═══════════════════════════════════════════════════════════════
+function renderPsyArc() {
+  const p = getProject();
+  const arcs = p.psyArcs || [];
+
+  const cols = arcs.map((arc, ai) => {
+    const steps = arc.steps || [];
+    const charColor = arc.charName ? getCharColor(arc.charName, p) : 'var(--gold)';
+    return `
+      <div class="arc-col" style="min-width:240px;max-width:240px;border-top:3px solid ${charColor}">
+        <div class="arc-col-header" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              ${arc.charName ? `<span style="background:${charColor};color:#fff;border-radius:20px;padding:1px 9px;font-size:11px;font-weight:700">${esc(arc.charName)}</span>` : ''}
+              <span class="arc-col-title">${esc(arc.title)}</span>
+            </div>
+            <div style="display:flex;gap:2px;flex-shrink:0">
+              <button class="btn-icon" onclick="showPsyArcModal(${ai})" style="width:26px;height:26px">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button onclick="deletePsyArc(${ai})" style="width:26px;height:26px;border-radius:50%;background:rgba(181,69,27,.1);border:none;cursor:pointer;color:var(--rust);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center">×</button>
+            </div>
+          </div>
+          ${arc.description ? `<div style="font-size:11px;color:var(--muted);line-height:1.6;font-weight:400">${esc(arc.description)}</div>` : ''}
+        </div>
+
+        ${steps.length === 0
+          ? `<div style="text-align:center;padding:20px 10px;color:var(--muted);font-size:12px">변화 단계를 추가해보세요</div>`
+          : `<div style="position:relative;padding-left:20px">
+              <div style="position:absolute;left:10px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,${charColor},var(--teal2));border-radius:2px;opacity:.5"></div>
+              ${steps.map((s, si) => `
+                <div style="position:relative;margin-bottom:10px">
+                  <div style="position:absolute;left:-14px;top:8px;width:10px;height:10px;border-radius:50%;
+                    background:${PSY_EMOTION_COLORS[s.emotion]||charColor};
+                    border:2px solid var(--paper);z-index:1;box-shadow:0 1px 4px var(--shadow)"></div>
+                  <div style="background:var(--white);border:1px solid var(--border);border-radius:9px;padding:9px 11px;cursor:pointer"
+                    onclick="showPsyStepModal(${ai},${si})">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+                      <div style="min-width:0">
+                        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;flex-wrap:wrap">
+                          <span style="font-size:14px">${PSY_EMOTION_ICONS[s.emotion]||'💭'}</span>
+                          <span style="font-weight:700;font-size:12px;word-break:break-all">${esc(s.title)}</span>
+                        </div>
+                        ${s.trigger ? `<div style="font-size:10px;color:var(--teal);margin-bottom:3px">← ${esc(s.trigger)}</div>` : ''}
+                        ${s.content ? `<div style="font-size:11px;color:var(--muted);line-height:1.6;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(s.content)}</div>` : ''}
+                      </div>
+                      <button onclick="event.stopPropagation();deletePsyStep(${ai},${si})"
+                        style="background:none;border:none;cursor:pointer;color:var(--rust);font-size:13px;font-weight:700;flex-shrink:0;padding:0">×</button>
+                    </div>
+                  </div>
+                </div>`).join('')}
+            </div>`}
+
+        <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center;margin-top:6px" onclick="showPsyStepModal(${ai})">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          단계 추가
+        </button>
+      </div>`;
+  }).join('');
+
+  document.getElementById('main').innerHTML = `
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px">
+        <div>
+          <div class="font-display" style="font-size:22px">심리 아크</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">인물의 감정선·가치관 변화를 기록하세요</div>
+        </div>
+        <button class="btn btn-gold" onclick="showPsyArcModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          추가
+        </button>
+      </div>
+      ${arcs.length === 0
+        ? `<div class="card empty-state"><div class="emoji">💭</div><p>인물의 심리 변화를 기록해보세요.<br><span style="font-size:12px">사건을 계기로 바뀌는 가치관, 감정선, 내면의 갈등</span></p></div>`
+        : `<div class="arc-list psy-arc-list">${cols}</div>`}
+    </div>`;
+}
+const PSY_EMOTION_ICONS = {
+  '희망':'🌱','결의':'⚔️','갈등':'🌀','절망':'🌑','분노':'🔥',
+  '슬픔':'💧','공포':'😱','각성':'⚡','성장':'🌟','변화':'🦋','기타':'💭'
+};
+const PSY_EMOTION_COLORS = {
+  '희망':'#4aabb0','결의':'#c4922a','갈등':'#7986cb','절망':'#546e7a',
+  '분노':'#e06040','슬픔':'#5c8db8','공포':'#7b5ea7','각성':'#f5a623',
+  '성장':'#4caf50','변화':'#ab47bc','기타':'#9a8e7f'
+};
+
+function getCharColor(name, p) {
+  const c = (p.characters||[]).find(x => x.name === name);
+  return c?.color || 'var(--teal)';
+}
+
+function showPsyArcModal(idx) {
+  const p = getProject();
+  const arc = idx !== undefined ? (p.psyArcs||[])[idx] : {};
+  const chars = p.characters || [];
+  showModal(`
+    <div class="modal-title">${idx !== undefined ? '심리 아크 수정' : '심리 아크 추가'}</div>
+    <div style="margin-bottom:12px">
+      <label class="label">인물</label>
+      <select id="pa-char">
+        <option value="">인물 선택 (선택)</option>
+        ${chars.map(c => `<option value="${esc(c.name)}" ${arc.charName===c.name?'selected':''}>${esc(c.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div style="margin-bottom:12px"><label class="label">아크 제목 *</label><input id="pa-title" value="${esc(arc.title||'')}" placeholder="예: 복수에서 용서로, 냉소주의자의 각성"></div>
+    <div style="margin-bottom:20px"><label class="label">설명</label><textarea id="pa-desc" rows="3" placeholder="이 인물의 심리 변화 방향을 간략히 설명하세요">${esc(arc.description||'')}</textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">취소</button>
+      <button class="btn btn-gold" onclick="savePsyArc(${idx})">저장</button>
+    </div>`, false);
+  setTimeout(() => document.getElementById('pa-title')?.focus(), 100);
+}
+
+function savePsyArc(idx) {
+  const title = document.getElementById('pa-title').value.trim();
+  if (!title) { toast('제목을 입력해주세요.'); return; }
+  const p = getProject();
+  if (!p.psyArcs) p.psyArcs = [];
+  const arc = {
+    id: idx !== undefined ? p.psyArcs[idx].id : uid(),
+    title,
+    charName: document.getElementById('pa-char').value,
+    description: document.getElementById('pa-desc').value,
+    steps: idx !== undefined ? p.psyArcs[idx].steps : [],
+  };
+  if (idx !== undefined) p.psyArcs[idx] = arc;
+  else p.psyArcs.push(arc);
+  autoSave(); closeModal(); renderPsyArc();
+}
+
+function deletePsyArc(idx) {
+  confirmDialog('이 심리 아크를 삭제합니다.', () => {
+    getProject().psyArcs.splice(idx, 1);
+    autoSave(); renderPsyArc(); toast('삭제했어요.');
+  });
+}
+
+function showPsyStepModal(ai, si) {
+  const p = getProject();
+  const s = si !== undefined ? (p.psyArcs[ai].steps||[])[si] : {};
+  const emotionOpts = Object.keys(PSY_EMOTION_ICONS).map(e =>
+    `<option value="${e}" ${s.emotion===e?'selected':''}>${PSY_EMOTION_ICONS[e]} ${e}</option>`).join('');
+  showModal(`
+    <div class="modal-title">${si !== undefined ? '단계 수정' : '변화 단계 추가'}</div>
+    <div style="margin-bottom:12px"><label class="label">단계 제목 *</label><input id="ps-title" value="${esc(s.title||'')}" placeholder="예: 배신으로 인한 분노, 진실을 깨닫다"></div>
+    <div style="margin-bottom:12px"><label class="label">감정/상태</label><select id="ps-emotion">${emotionOpts}</select></div>
+    <div style="margin-bottom:12px"><label class="label">계기 (어떤 사건이 이 변화를 일으켰나요?)</label><input id="ps-trigger" value="${esc(s.trigger||'')}" placeholder="예: 3장 - 스승의 죽음"></div>
+    <div style="margin-bottom:20px"><label class="label">내면 묘사</label><textarea id="ps-content" rows="4" placeholder="이 시점 인물의 생각, 가치관, 감정을 자세히 기록하세요">${esc(s.content||'')}</textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">취소</button>
+      <button class="btn btn-gold" onclick="savePsyStep(${ai},${si})">저장</button>
+    </div>`, false);
+  setTimeout(() => document.getElementById('ps-title')?.focus(), 100);
+}
+
+function savePsyStep(ai, si) {
+  const title = document.getElementById('ps-title').value.trim();
+  if (!title) { toast('제목을 입력해주세요.'); return; }
+  const p = getProject();
+  if (!p.psyArcs[ai].steps) p.psyArcs[ai].steps = [];
+  const step = {
+    id: si !== undefined ? p.psyArcs[ai].steps[si].id : uid(),
+    title,
+    emotion: document.getElementById('ps-emotion').value,
+    trigger: document.getElementById('ps-trigger').value,
+    content: document.getElementById('ps-content').value,
+  };
+  if (si !== undefined) p.psyArcs[ai].steps[si] = step;
+  else p.psyArcs[ai].steps.push(step);
+  autoSave(); closeModal(); renderPsyArc();
+}
+
+function deletePsyStep(ai, si) {
+  getProject().psyArcs[ai].steps.splice(si, 1);
+  autoSave(); renderPsyArc();
+}
+
 function renderFamily() {
   const p = getProject();
   const families = p.families || [];
