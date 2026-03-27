@@ -4474,28 +4474,27 @@ function renderSplitContent() {
 
   } else if (splitTab === 'memo') {
     const memos = getChapterMemos();
-    const splitMemoColors = [{bg:'#fff8e1',border:'#f5d76e'}]; // dummy, 안 씀
     el.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <span style="font-size:12px;font-weight:700;color:var(--muted)">집필 메모 (${memos.length})</span>
+        <span style="font-size:12px;font-weight:700;color:var(--muted)">메모 (${memos.length})</span>
         <button onclick="addChapterMemo()" class="btn btn-gold btn-sm">＋ 추가</button>
       </div>
       ${memos.length === 0
         ? '<div style="color:var(--muted);text-align:center;padding:30px 0;font-size:13px">＋ 추가 버튼으로 메모를 만들어보세요</div>'
         : memos.map((m,i) => `
-          <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;background:var(--white)">
-            <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--cream)">
+          <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;background:${m.color||'#fff8e1'}">
+            <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid rgba(0,0,0,.06)">
               <input value="${esc(m.title||'')}" oninput="updateChapterMemoTitle(${i},this.value)"
                 placeholder="제목 (선택)"
-                style="flex:1;border:none;outline:none;background:transparent;font-weight:700;font-size:13px;color:var(--ink)">
+                style="flex:1;border:none;outline:none;background:transparent;font-weight:700;font-size:13px;color:#1a1208">
               <button onclick="deleteChapterMemo(${i})"
-                style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--rust);flex-shrink:0">✕</button>
+                style="background:none;border:none;cursor:pointer;font-size:13px;color:#b5451b;flex-shrink:0">✕</button>
             </div>
             <textarea oninput="updateChapterMemoText(${i},this.value)" rows="4"
               placeholder="메모를 입력하세요..."
               style="width:100%;padding:10px 12px;font-size:13px;line-height:1.8;
-                background:var(--white);border:none;outline:none;resize:vertical;
-                font-family:'Noto Serif KR',serif;color:var(--ink)">${esc(m.text||'')}</textarea>
+                background:transparent;border:none;outline:none;resize:vertical;
+                font-family:'Noto Serif KR',serif;color:#1a1208">${esc(m.content||'')}</textarea>
           </div>`).join('')}
     `;
   }
@@ -4547,12 +4546,14 @@ function toggleChapterList() {
 // ═══════════════════════════════════════════════════════════
 function getChapterMemos() {
   const p = getProject();
-  if (!p.chapterMemos) p.chapterMemos = [];
-  return p.chapterMemos;
+  if (!p.memos) p.memos = [];
+  return p.memos;
 }
 
 function addChapterMemo() {
-  getChapterMemos().push({ id: uid(), text: '', title: '', date: new Date().toISOString() });
+  const p = getProject();
+  if (!p.memos) p.memos = [];
+  p.memos.unshift({ id: uid(), title: '', content: '', color: '#fff8e1', updatedAt: new Date().toISOString() });
   autoSave();
   renderSplitContent();
 }
@@ -4565,12 +4566,12 @@ function deleteChapterMemo(idx) {
 
 function updateChapterMemoText(idx, val) {
   const m = getChapterMemos()[idx];
-  if (m) { m.text = val; autoSave(); }
+  if (m) { m.content = val; m.updatedAt = new Date().toISOString(); autoSave(); }
 }
 
 function updateChapterMemoTitle(idx, val) {
   const m = getChapterMemos()[idx];
-  if (m) { m.title = val; autoSave(); }
+  if (m) { m.title = val; m.updatedAt = new Date().toISOString(); autoSave(); }
 }
 
 
