@@ -1430,38 +1430,68 @@ function renderWorld() {
     const minY = events[0].year || 0;
     const maxY = events[events.length-1].year || 0;
     const range = Math.max(maxY - minY, 1);
+
+    // 연도별 그룹핑
+    const yearGroups = {};
+    events.forEach((ev, ei) => {
+      const key = ev.year;
+      if (!yearGroups[key]) yearGroups[key] = [];
+      yearGroups[key].push({ev, ei});
+    });
+    const uniqueYears = Object.keys(yearGroups).map(Number).sort((a,b)=>a-b);
+
+    // 그룹당 최대 노드 수로 높이 결정
+    const maxStack = Math.max(...Object.values(yearGroups).map(g=>g.length));
+    const DOT = 20; // 점 크기
+    const GAP = 10;  // 점 간격
+    const TOUCH = 44; // 터치 영역 크기
+    const LINE_Y = 40; // 가로선 y위치 (상단에서 px)
+    const totalH = LINE_Y + 16 + (maxStack - 1) * (DOT + GAP) + 40; // 선 위 라벨 + 아래 점들
+
+    const minWidth = Math.max(uniqueYears.length * 100, 400);
+
+    let nodesHtml = '';
+    uniqueYears.forEach(yr => {
+      const pct = range === 0 ? 50 : ((yr - minY) / range * 86 + 7);
+      const group = yearGroups[yr];
+      // 연도 라벨
+      nodesHtml += `<div style="position:absolute;left:${pct}%;transform:translateX(-50%);
+        top:${LINE_Y - 22}px;font-size:10px;color:var(--muted);text-align:center;white-space:nowrap">
+        ${esc(String(group[0].ev.yearLabel || yr))}</div>`;
+      // 가로선 위 점
+      nodesHtml += `<div style="position:absolute;left:${pct}%;top:${LINE_Y - 5}px;
+        transform:translateX(-50%);width:2px;height:10px;background:var(--border)"></div>`;
+      // 각 사건 점
+      group.forEach(({ev, ei}, si) => {
+        const color = TL_COLOR_MAP[ev.type] || TL_COLOR_MAP['기타'];
+        const dotTop = LINE_Y + 8 + si * (DOT + GAP);
+        const origIdx = (p.worldTimeline||[]).findIndex(e => e.id === ev.id);
+        nodesHtml += `
+          <button class="tl-node" data-ei="${ei}"
+            style="position:absolute;left:${pct}%;top:${dotTop - (TOUCH-DOT)/2}px;
+              transform:translateX(-50%);
+              width:${TOUCH}px;height:${TOUCH}px;
+              display:flex;align-items:center;justify-content:center;
+              background:transparent;border:none;
+              cursor:pointer;z-index:2;padding:0;-webkit-tap-highlight-color:transparent;"
+            title="${esc(ev.title)}"
+            onclick="toggleTlDetail('tld-${origIdx}')">
+            <div style="width:${DOT}px;height:${DOT}px;border-radius:50%;
+              background:${color};border:2px solid var(--paper);
+              box-shadow:0 2px 6px var(--shadow);pointer-events:none;
+              transition:transform .15s" 
+              onmouseenter="this.style.transform='scale(1.3)'"
+              onmouseleave="this.style.transform='scale(1)'"></div>
+          </button>`;
+      });
+    });
+
     timelineHtml = `
       <div style="position:relative;overflow-x:auto;padding-bottom:8px">
-        <!-- 타임라인 선 -->
-        <div style="position:relative;min-width:${Math.max(events.length*110, 400)}px;height:120px;margin-bottom:8px">
-          <div style="position:absolute;top:50%;left:0;right:0;height:2px;background:var(--border);transform:translateY(-50%)"></div>
-          ${events.map((ev, ei) => {
-            const pct = range === 0 ? 50 : ((ev.year - minY) / range * 90 + 5);
-            const color = TL_COLOR_MAP[ev.type] || TL_COLOR_MAP['기타'];
-            const top = ei % 2 === 0;
-            return `
-              <div style="position:absolute;left:${pct}%;transform:translateX(-50%);${top?'top:0':'bottom:0'};
-                display:flex;flex-direction:column;align-items:center;cursor:pointer;width:100px"
-                onclick="toggleTlDetail('tld-${ei}')">
-                ${top ? `
-                  <div style="background:var(--white);border:1.5px solid ${color};border-radius:8px;
-                    padding:5px 8px;font-size:11px;font-weight:700;color:${color};
-                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;
-                    box-shadow:0 2px 6px var(--shadow);margin-bottom:4px;text-align:center">${esc(ev.title)}</div>
-                  <div style="font-size:10px;color:var(--muted);margin-bottom:4px">${esc(ev.yearLabel||String(ev.year))}</div>
-                  <div style="width:2px;height:20px;background:${color}"></div>
-                  <div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid var(--paper)"></div>
-                ` : `
-                  <div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid var(--paper)"></div>
-                  <div style="width:2px;height:20px;background:${color}"></div>
-                  <div style="font-size:10px;color:var(--muted);margin-top:4px">${esc(ev.yearLabel||String(ev.year))}</div>
-                  <div style="background:var(--white);border:1.5px solid ${color};border-radius:8px;
-                    padding:5px 8px;font-size:11px;font-weight:700;color:${color};
-                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;
-                    box-shadow:0 2px 6px var(--shadow);margin-top:4px;text-align:center">${esc(ev.title)}</div>
-                `}
-              </div>`;
-          }).join('')}
+        <div style="position:relative;min-width:${minWidth}px;height:${totalH}px;margin-bottom:8px">
+          <!-- 가로선 -->
+          <div style="position:absolute;top:${LINE_Y}px;left:3%;right:3%;height:2px;background:var(--border)"></div>
+          ${nodesHtml}
         </div>
         <!-- 범례 -->
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
@@ -1476,13 +1506,16 @@ function renderWorld() {
             const color = TL_COLOR_MAP[ev.type] || TL_COLOR_MAP['기타'];
             const origIdx = (p.worldTimeline||[]).findIndex(e => e.id === ev.id);
             return `
-            <div id="tld-${ei}" style="display:none;border:1.5px solid ${color};border-radius:10px;overflow:hidden">
-              <div style="padding:10px 14px;background:${color}18;display:flex;justify-content:space-between;align-items:center">
+            <div id="tld-${origIdx}" style="display:none;border:1.5px solid ${color};border-radius:10px;overflow:hidden">
+              <div style="padding:10px 14px;background:${color}18;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
                 <div>
                   <span style="font-weight:700;font-size:14px;color:${color}">${esc(ev.title)}</span>
                   <span style="font-size:11px;color:var(--muted);margin-left:8px">${esc(ev.yearLabel||String(ev.year))} · ${esc(ev.type)}</span>
                 </div>
-                <button class="btn btn-outline btn-sm" onclick="showTimelineModal(${origIdx})" style="font-size:11px">✏️ 수정</button>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-outline btn-sm" onclick="showTimelineModal(${origIdx})" style="font-size:11px">✏️ 수정</button>
+                  <button class="btn btn-danger btn-sm" onclick="deleteTimeline(${origIdx})" style="font-size:11px">🗑️ 삭제</button>
+                </div>
               </div>
               <div style="padding:10px 14px;font-size:13px;line-height:1.7">
                 ${ev.desc ? `<div style="color:var(--muted);margin-bottom:8px;white-space:pre-wrap">${esc(ev.desc)}</div>` : ''}
@@ -1575,6 +1608,8 @@ function toggleTlDetail(id) {
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
+
+
 // 타임라인
 const TL_TYPES = ['전쟁','정치','재앙','문화','종교','경제','기타'];
 function showTimelineModal(idx) {
@@ -1584,8 +1619,10 @@ function showTimelineModal(idx) {
   showModal(`
     <div class="modal-title">${idx !== undefined ? '사건 수정' : '사건 추가'}</div>
     <div class="form-grid">
-      <div><label class="label">연도/시기 *</label>
-        <input id="tl-year" value="${esc(ev.year??'')}" placeholder="예: 300, 건국 3년차, B.C 12"></div>
+      <div><label class="label">표시 연도/시기 *</label>
+        <input id="tl-year" value="${esc(ev.yearLabel||String(ev.year??''))}" placeholder="예: 건국 3년차, 300년 전, B.C 12"></div>
+      <div><label class="label">정렬 순서 (숫자) *<span style="font-size:10px;color:var(--muted);font-weight:400"> 작을수록 왼쪽</span></label>
+        <input id="tl-order" type="number" value="${ev.year??''}" placeholder="예: -300, 1, 100"></div>
       <div><label class="label">사건 종류</label>
         <select id="tl-type">${TL_TYPES.map(t=>`<option value="${t}" ${ev.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div class="full"><label class="label">사건명 *</label>
@@ -1607,8 +1644,9 @@ function showTimelineModal(idx) {
 function saveTimeline(idx) {
   const title = document.getElementById('tl-title').value.trim();
   const yearRaw = document.getElementById('tl-year').value.trim();
-  if (!title || !yearRaw) { toast('연도와 사건명을 입력해주세요.'); return; }
-  const yearNum = parseFloat(yearRaw) || 0;
+  const orderRaw = document.getElementById('tl-order').value.trim();
+  if (!title || !yearRaw || orderRaw === '') { toast('표시 연도, 정렬 순서, 사건명을 입력해주세요.'); return; }
+  const yearNum = parseFloat(orderRaw);
   const p = getProject();
   if (!p.worldTimeline) p.worldTimeline = [];
   const ev = {
