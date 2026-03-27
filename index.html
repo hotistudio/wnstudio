@@ -2302,20 +2302,29 @@ function newChapter() {
   if (!p.chapters) p.chapters = [];
   const newCh = { id: uid(), title: `${p.chapters.length+1}화`, content: '', status: '초안', createdAt: new Date().toISOString() };
 
-  // 현재 활성 화 기준으로 바로 아래 삽입
   const curIdx = p.chapters.findIndex(c => c.id === activeChapterId);
   if (curIdx !== -1) {
     const curCh = p.chapters[curIdx];
-    // 같은 폴더에 속하게
     if (curCh.folderId) newCh.folderId = curCh.folderId;
-    // 현재 화 바로 다음에 삽입
     p.chapters.splice(curIdx + 1, 0, newCh);
   } else {
     p.chapters.push(newCh);
   }
 
   activeChapterId = newCh.id;
+  const savedScroll = document.getElementById('chapter-list-body')?.scrollTop || 0;
   autoSave(); renderChapters();
+  setTimeout(() => {
+    const lb = document.getElementById('chapter-list-body');
+    if (!lb) return;
+    // 새 화 아이템 찾아서 보이도록 스크롤
+    const newItem = lb.querySelector(`[data-chid="${newCh.id}"]`);
+    if (newItem) {
+      newItem.scrollIntoView({block:'nearest', behavior:'smooth'});
+    } else {
+      lb.scrollTop = savedScroll;
+    }
+  }, 30);
 }
 
 function updateChapter(id, key, val) {
