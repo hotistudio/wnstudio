@@ -5206,8 +5206,8 @@ function renderStats() {
     else break;
   }
 
-  // 히트맵 (15주)
-  const weeks = 15;
+  // 히트맵 (8주)
+  const weeks = 12;
   const days = weeks * 7;
   const calStart = new Date();
   calStart.setDate(calStart.getDate() - days + 1);
@@ -5221,8 +5221,27 @@ function renderStats() {
     const val = pStats[key] || 0;
     const intensity = val === 0 ? 0 : Math.ceil((val / maxVal) * 4);
     const isToday = key === today;
-    calCells += `<div title="${key}: ${val.toLocaleString()}자" style="width:12px;height:12px;border-radius:2px;background:${colors[intensity]};${isToday?'outline:2px solid var(--gold);outline-offset:1px':''}"></div>`;
+    calCells += `<div title="${key}: ${val.toLocaleString()}자" style="width:16px;height:16px;border-radius:3px;background:${colors[intensity]};${isToday?'outline:2px solid var(--gold);outline-offset:1px':''}"></div>`;
   }
+
+  // 월별 통계 (2026년 3월부터 현재까지)
+  const startYear = 2026, startMonth = 2; // 0-indexed: 2 = 3월
+  const nowDate = new Date();
+  const monthStats = [];
+  let my = startYear, mm = startMonth;
+  while (my < nowDate.getFullYear() || (my === nowDate.getFullYear() && mm <= nowDate.getMonth())) {
+    const label = `${my}/${mm+1}월`;
+    let total = 0;
+    const daysInMonth = new Date(my, mm+1, 0).getDate();
+    for (let d2 = 1; d2 <= daysInMonth; d2++) {
+      const key = `${my}-${String(mm+1).padStart(2,'0')}-${String(d2).padStart(2,'0')}`;
+      total += pStats[key] || 0;
+    }
+    monthStats.push({ label, total });
+    mm++;
+    if (mm > 11) { mm = 0; my++; }
+  }
+  const maxMonth = Math.max(...monthStats.map(m => m.total), 1);
 
   // 최근 30일 합산
   const last30 = Array.from({length:30},(_,i)=>{
@@ -5281,14 +5300,33 @@ function renderStats() {
       </div>
 
       <div class="card card-sm">
-        <div style="font-weight:700;font-size:13px;margin-bottom:12px">📅 집필 달력 (최근 ${weeks}주)</div>
-        <div style="display:grid;grid-template-columns:repeat(${weeks},12px);gap:3px;overflow-x:auto;padding-bottom:4px">
-          ${calCells}
-        </div>
-        <div style="display:flex;align-items:center;gap:5px;margin-top:10px;justify-content:flex-end">
-          <span style="font-size:10px;color:var(--muted)">적음</span>
-          ${colors.map(c=>`<div style="width:10px;height:10px;border-radius:2px;background:${c}"></div>`).join('')}
-          <span style="font-size:10px;color:var(--muted)">많음</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+          <!-- 달력 히트맵 -->
+          <div>
+            <div style="font-weight:700;font-size:12px;margin-bottom:10px;color:var(--muted)">📅 최근 ${weeks}주</div>
+            <div style="display:grid;grid-template-columns:repeat(${weeks},16px);gap:3px">
+              ${calCells}
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;margin-top:8px">
+              <span style="font-size:10px;color:var(--muted)">적음</span>
+              ${colors.map(c=>`<div style="width:12px;height:12px;border-radius:2px;background:${c}"></div>`).join('')}
+              <span style="font-size:10px;color:var(--muted)">많음</span>
+            </div>
+          </div>
+          <!-- 월별 통계 -->
+          <div>
+            <div style="font-weight:700;font-size:12px;margin-bottom:10px;color:var(--muted)">📊 월별 글자 수</div>
+            ${monthStats.map(m => `
+              <div style="margin-bottom:7px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                  <span style="font-size:11px;font-weight:600">${m.label}</span>
+                  <span style="font-size:11px;color:var(--muted)">${m.total.toLocaleString()}자</span>
+                </div>
+                <div style="height:5px;background:var(--cream);border-radius:3px;overflow:hidden">
+                  <div style="height:100%;width:${Math.round(m.total/maxMonth*100)}%;background:var(--teal2);border-radius:3px;transition:width .4s"></div>
+                </div>
+              </div>`).join('')}
+          </div>
         </div>
       </div>
     </div>`;
