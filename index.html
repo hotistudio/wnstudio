@@ -1699,8 +1699,12 @@ function renderChapters() {
     const collapsed = window._folderCollapsed[f.id] || false;
     const fChapters = chapters.filter(c => c.folderId === f.id);
     listHtml += `
-      <div class="ch-folder" data-folderid="${f.id}">
+      <div class="ch-folder cf-drag-item" data-folderid="${f.id}">
         <div class="ch-folder-header" onclick="toggleChFolder('${f.id}')">
+          <span class="cf-drag-handle" data-folderid="${f.id}"
+            style="color:var(--border);font-size:13px;cursor:grab;flex-shrink:0;
+              touch-action:none;user-select:none;padding:0 2px"
+            onclick="event.stopPropagation()">⠿</span>
           <span style="font-size:10px;transition:transform .2s;display:inline-block;transform:rotate(${collapsed?'-90':'0'}deg);color:var(--muted)">▾</span>
           <span style="font-size:11px;font-weight:700;color:var(--muted);flex:1;
             overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span>
@@ -1850,6 +1854,87 @@ function selectChapter(id) {
 }
 
 // 폴더 기능
+// 폴더 드래그 앤 드롭
+let _cfDrag = null;
+
+function cfTouchStart(e) {
+  e.preventDefault();
+  cfDragInit(e.currentTarget, e.touches[0].clientY);
+  document.addEventListener('touchmove', cfTouchMove, {passive: false});
+  document.addEventListener('touchend', cfTouchEnd, {once: true});
+}
+function cfMouseStart(e) {
+  cfDragInit(e.currentTarget, e.clientY);
+  document.addEventListener('mousemove', cfMouseMove);
+  document.addEventListener('mouseup', cfMouseEnd, {once: true});
+}
+function cfDragInit(handle, clientY) {
+  const fid = handle.dataset.folderid;
+  const row = handle.closest('.cf-drag-item');
+  const rect = row.getBoundingClientRect();
+  const name = row.querySelector('.ch-folder-header span:nth-child(3)')?.textContent || '';
+  const ghost = document.createElement('div');
+  ghost.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;
+    width:${rect.width}px;z-index:9999;pointer-events:none;
+    background:var(--gold-light);border:1.5px solid var(--gold);
+    border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;
+    color:var(--ink);box-shadow:0 4px 16px rgba(0,0,0,.2)`;
+  ghost.textContent = '📁 ' + name;
+  document.body.appendChild(ghost);
+  row.style.opacity = '0.3';
+  _cfDrag = { fid, el: row, ghost, offsetY: clientY - rect.top };
+}
+function cfTouchMove(e) { e.preventDefault(); if (_cfDrag) cfDragMove(e.touches[0].clientY); }
+function cfMouseMove(e) { if (_cfDrag) cfDragMove(e.clientY); }
+function cfDragMove(clientY) {
+  const { ghost, offsetY } = _cfDrag;
+  ghost.style.top = (clientY - offsetY) + 'px';
+  document.querySelectorAll('.cf-drag-item').forEach(r => r.style.borderTop = '');
+  const items = [...document.querySelectorAll('.cf-drag-item')];
+  let insertBefore = null;
+  for (let i = 0; i < items.length; i++) {
+    const r = items[i].getBoundingClientRect();
+    if (clientY < r.top + r.height / 2) {
+      if (items[i] !== _cfDrag.el) {
+        items[i].style.borderTop = '2px solid var(--gold)';
+        insertBefore = items[i].dataset.folderid;
+      }
+      break;
+    }
+    if (i === items.length - 1) insertBefore = '__end__';
+  }
+  _cfDrag.insertBefore = insertBefore;
+}
+function cfTouchEnd() { document.removeEventListener('touchmove', cfTouchMove); cfDragCommit(); }
+function cfMouseEnd() { document.removeEventListener('mousemove', cfMouseMove); cfDragCommit(); }
+function cfDragCommit() {
+  if (!_cfDrag) return;
+  const { fid, el, ghost, insertBefore } = _cfDrag;
+  _cfDrag = null;
+  ghost.remove();
+  el.style.opacity = '';
+  document.querySelectorAll('.cf-drag-item').forEach(r => r.style.borderTop = '');
+
+  const p = getProject();
+  const folders = p.chapterFolders || [];
+  const fromIdx = folders.findIndex(f => f.id === fid);
+  if (fromIdx === -1 || !insertBefore) { renderChapters(); return; }
+
+  if (insertBefore !== '__end__') {
+    const toIdx = folders.findIndex(f => f.id === insertBefore);
+    if (toIdx !== -1 && toIdx !== fromIdx) {
+      const [item] = folders.splice(fromIdx, 1);
+      const newTo = folders.findIndex(f => f.id === insertBefore);
+      folders.splice(newTo, 0, item);
+    }
+  } else {
+    const [item] = folders.splice(fromIdx, 1);
+    folders.push(item);
+  }
+  autoSave(); renderChapters();
+  setTimeout(initChDrag, 50);
+}
+
 function newFolder() {
   showModal(`
     <div class="modal-title">폴더 추가</div>
@@ -1918,6 +2003,10 @@ function initChDrag() {
   document.querySelectorAll('.ch-drag-handle').forEach(h => {
     h.addEventListener('touchstart', chTouchStart, {passive: false});
     h.addEventListener('mousedown', chMouseStart);
+  });
+  document.querySelectorAll('.cf-drag-handle').forEach(h => {
+    h.addEventListener('touchstart', cfTouchStart, {passive: false});
+    h.addEventListener('mousedown', cfMouseStart);
   });
 }
 function chTouchStart(e) {
