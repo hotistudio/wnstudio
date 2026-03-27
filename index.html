@@ -1910,7 +1910,12 @@ function renderChapters() {
           </div>`}
       </div>
     </div>`;
-  setTimeout(() => { refreshShortcutBar(); applyEditorFontSize(); initChDrag(); }, 0);
+  const prevScroll = document.getElementById('chapter-list-body')?.scrollTop || 0;
+  setTimeout(() => {
+    refreshShortcutBar(); applyEditorFontSize(); initChDrag();
+    const listBody = document.getElementById('chapter-list-body');
+    if (listBody) listBody.scrollTop = prevScroll;
+  }, 0);
 }
 
 function renderEditorContent(ch) {
@@ -1994,16 +1999,20 @@ function updateChapterListItem(ch) {
 
 function selectChapter(id) {
   activeChapterId = id;
-  // 참고 패널 열림/닫힘 상태 보존
   const sp = document.getElementById('split-panel');
   const wasOpen = sp && !sp.classList.contains('hidden');
+  const savedScroll = document.getElementById('chapter-list-body')?.scrollTop || 0;
   renderChapters();
-  // 렌더 후 상태 복원
   const sp2 = document.getElementById('split-panel');
   if (sp2) {
     if (wasOpen) sp2.classList.remove('hidden');
     else sp2.classList.add('hidden');
   }
+  // 스크롤 위치 복원
+  setTimeout(() => {
+    const lb = document.getElementById('chapter-list-body');
+    if (lb) lb.scrollTop = savedScroll;
+  }, 0);
   if (window.innerWidth <= 768) {
     setTimeout(() => {
       const ea = document.getElementById('editor-area');
