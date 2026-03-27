@@ -2113,7 +2113,14 @@ function confirmNewFolder() {
   const p = getProject();
   if (!p.chapterFolders) p.chapterFolders = [];
   p.chapterFolders.push({ id: uid(), name });
-  autoSave(); closeModal(); renderChapters();
+  autoSave(); closeModal();
+  const body = document.getElementById('chapter-list-body');
+  const scrollTop = body ? body.scrollTop : 0;
+  renderChapters();
+  setTimeout(() => {
+    const newBody = document.getElementById('chapter-list-body');
+    if (newBody) newBody.scrollTop = scrollTop;
+  }, 0);
 }
 
 function toggleChFolder(fid) {
