@@ -1882,11 +1882,6 @@ function renderChapters() {
       </div>`;
   });
 
-  // 폴더 없을 때 드롭 힌트
-  if (folders.length > 0 && noFolder.length === 0 && chapters.length > 0) {
-    listHtml = `<div style="padding:6px 10px;font-size:11px;color:var(--border);text-align:center">폴더 밖 화 없음</div>` + listHtml;
-  }
-
   document.getElementById('main').innerHTML = `
     <div class="editor-wrap">
       <div class="chapter-list-wrap" id="chapter-list-wrap">
@@ -2245,9 +2240,24 @@ function chDragCommit() {
   const fromIdx = chapters.findIndex(c => c.id === chid);
   if (fromIdx === -1) { renderChapters(); return; }
 
-  // 폴더 변경
+  // 폴더 변경 + 순서 이동
   if (targetFolder !== undefined && targetFolder !== null) {
+    // 폴더로 드래그 → folderId 변경 + 해당 폴더의 마지막으로 이동
     chapters[fromIdx].folderId = targetFolder;
+    // 해당 폴더의 마지막 화 인덱스 찾기
+    const folderChIds = chapters
+      .map((c, i) => ({c, i}))
+      .filter(({c, i}) => c.folderId === targetFolder && i !== fromIdx)
+      .map(({i}) => i);
+    const lastFolderIdx = folderChIds.length > 0 ? Math.max(...folderChIds) : -1;
+    if (lastFolderIdx !== -1 && lastFolderIdx !== fromIdx) {
+      const [item] = chapters.splice(fromIdx, 1);
+      const newLast = chapters.map((c, i) => ({c, i}))
+        .filter(({c}) => c.folderId === targetFolder)
+        .map(({i}) => i);
+      const insertAt = newLast.length > 0 ? Math.max(...newLast) + 1 : fromIdx;
+      chapters.splice(insertAt, 0, item);
+    }
   } else if (insertBefore && insertBefore !== '__end__') {
     // insertBefore 위치의 화와 같은 폴더로
     const targetCh = chapters.find(c => c.id === insertBefore);
@@ -2255,10 +2265,7 @@ function chDragCommit() {
       if (targetCh.folderId) chapters[fromIdx].folderId = targetCh.folderId;
       else delete chapters[fromIdx].folderId;
     }
-  }
-
-  // 순서 변경
-  if (insertBefore && insertBefore !== '__end__') {
+    // 순서 변경
     const toIdx = chapters.findIndex(c => c.id === insertBefore);
     if (toIdx !== -1 && toIdx !== fromIdx) {
       const [item] = chapters.splice(fromIdx, 1);
@@ -2276,10 +2283,22 @@ function chDragCommit() {
 
 function newChapter() {
   const p = getProject();
-  const ch = { id: uid(), title: `${(p.chapters||[]).length+1}화`, content: '', status: '초안', createdAt: new Date().toISOString() };
   if (!p.chapters) p.chapters = [];
-  p.chapters.push(ch);
-  activeChapterId = ch.id;
+  const newCh = { id: uid(), title: `${p.chapters.length+1}화`, content: '', status: '초안', createdAt: new Date().toISOString() };
+
+  // 현재 활성 화 기준으로 바로 아래 삽입
+  const curIdx = p.chapters.findIndex(c => c.id === activeChapterId);
+  if (curIdx !== -1) {
+    const curCh = p.chapters[curIdx];
+    // 같은 폴더에 속하게
+    if (curCh.folderId) newCh.folderId = curCh.folderId;
+    // 현재 화 바로 다음에 삽입
+    p.chapters.splice(curIdx + 1, 0, newCh);
+  } else {
+    p.chapters.push(newCh);
+  }
+
+  activeChapterId = newCh.id;
   autoSave(); renderChapters();
 }
 
