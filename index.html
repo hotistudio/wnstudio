@@ -472,7 +472,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 <div id="app">
   <!-- HEADER -->
   <header id="header">
-    <button id="header-title" onclick="goHome()">호트 웹소설 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.3.1</span></button>
+    <button id="header-title" onclick="goHome()">호트 웹소설 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.3.2</span></button>
     <button class="header-btn" id="menu-toggle" onclick="toggleSidebar()" style="display:none;padding:6px 8px">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- 왼쪽 세로선 -->
@@ -794,7 +794,24 @@ function updateBadges() {
 const GENRES = ['판타지','현대 판타지','로맨스','로맨스 판타지','무협','SF','스릴러','호러','일상물','기타'];
 const STATUSES = ['기획중','집필중','탈고','연재중','완결'];
 const ROLES = ['주인공','히로인/히어로','조력자','악역','중립','조연','단역'];
-const WORLD_CATS = ['지리/장소','역사/문화','마법/능력 체계','사회/정치','종족/계층','용어 사전','기타'];
+const WORLD_CATS_COMMON = ['역사/연표','종족/민족','언어','종교/신앙','마법·기술 체계','법률/제도','경제/화폐','문화/관습','기타'];
+const WORLD_CATS_GEO = {
+  '판타지':        ['세계/차원','대륙','왕국','지역','도시','마을/장소'],
+  '로맨스 판타지': ['세계/차원','대륙','왕국','지역','도시','마을/장소'],
+  '현대 판타지':   ['국가','도시','구/지역','장소/건물'],
+  '로맨스':        ['국가','도시','구/지역','장소/건물'],
+  '무협':          ['천하','지역','문파/도시','마을/장소'],
+  'SF':            ['은하/성계','행성','구역','도시','장소'],
+  '스릴러':        ['국가','도시','구/지역','장소/건물'],
+  '호러':          ['국가','도시','구/지역','장소/건물'],
+  '일상물':        ['국가','도시','구/지역','장소/건물'],
+  '기타':          ['지역','도시','장소'],
+};
+function getWorldCats(genre) {
+  const geo = WORLD_CATS_GEO[genre] || WORLD_CATS_GEO['기타'];
+  return [...geo, ...WORLD_CATS_COMMON];
+}
+const WORLD_CATS = getWorldCats('판타지');
 const SCENE_TYPES = ['평범','긴장감','갈등','전투','로맨스','반전','복선','클라이맥스'];
 const CH_STATUSES = ['초안','수정중','완료'];
 const PLATFORMS = ['카카오페이지','네이버 시리즈','문피아','조아라','리디','기타'];
@@ -1278,12 +1295,16 @@ function deleteRelation(i) {
 function renderWorld() {
   const p = getProject();
   const items = p.worldSettings || [];
+  const cats = getWorldCats(p.genre);
   const grouped = {};
-  WORLD_CATS.forEach(c => { grouped[c] = items.filter(i => i.category === c); });
+  cats.forEach(c => { grouped[c] = items.filter(i => i.category === c); });
+  // 등록은 됐지만 현재 장르에 없는 카테고리도 표시
+  items.forEach(i => { if (!grouped[i.category]) grouped[i.category] = items.filter(x => x.category === i.category); });
 
   let html = '';
-  WORLD_CATS.forEach(cat => {
-    const catItems = grouped[cat];
+  const allCats = [...cats, ...Object.keys(grouped).filter(c => !cats.includes(c))];
+  allCats.forEach(cat => {
+    const catItems = grouped[cat] || [];
     if (catItems.length === 0) return;
     html += `<div style="margin-bottom:20px">
       <div style="font-family:'Noto Serif KR',serif;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:10px;letter-spacing:1px">${esc(cat)}</div>
@@ -1330,10 +1351,21 @@ function renderWorld() {
 function showWorldModal(idx) {
   const p = getProject();
   const w = idx !== undefined ? p.worldSettings[idx] : {};
+  const cats = getWorldCats(p.genre);
+  const defaultCat = w.category || cats[0];
+  // 지리 계층과 공통 카테고리 구분해서 optgroup으로 표시
+  const geo = WORLD_CATS_GEO[p.genre] || WORLD_CATS_GEO['기타'];
+  const catOpts = `
+    <optgroup label="📍 지리/장소">
+      ${geo.map(c => `<option value="${c}" ${defaultCat===c?'selected':''}>${c}</option>`).join('')}
+    </optgroup>
+    <optgroup label="📚 공통 설정">
+      ${WORLD_CATS_COMMON.map(c => `<option value="${c}" ${defaultCat===c?'selected':''}>${c}</option>`).join('')}
+    </optgroup>`;
   showModal(`
     <div class="modal-title">${idx !== undefined ? '설정 수정' : '설정 추가'}</div>
     <div style="margin-bottom:12px"><label class="label">항목명 *</label><input id="wm-title" value="${esc(w.title||'')}" placeholder="설정 이름"></div>
-    <div style="margin-bottom:12px"><label class="label">카테고리</label><select id="wm-cat">${selOpts(WORLD_CATS,w.category||WORLD_CATS[0])}</select></div>
+    <div style="margin-bottom:12px"><label class="label">카테고리</label><select id="wm-cat">${catOpts}</select></div>
     <div style="margin-bottom:20px"><label class="label">내용</label><textarea id="wm-content" rows="6" placeholder="설정 내용을 자세히 설명하세요">${esc(w.content||'')}</textarea></div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
@@ -3624,11 +3656,14 @@ function renderSplitContent() {
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push({...w, _i:i});
     });
+    // 장르 카테고리 순서대로 정렬
+    const orderedCats = [...getWorldCats(p.genre), ...Object.keys(groups).filter(c => !getWorldCats(p.genre).includes(c))];
+    const sortedGroups = orderedCats.filter(c => groups[c]).map(c => [c, groups[c]]);
     el.innerHTML = `
       <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
         <button class="btn btn-gold btn-sm" onclick="showWorldModal()">＋ 추가</button>
       </div>
-      ${Object.entries(groups).map(([cat, items]) => `
+      ${sortedGroups.map(([cat, items]) => `
         <div style="margin-bottom:16px">
           <div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;margin-bottom:6px">${esc(cat)}</div>
           ${items.map(w => `
@@ -3707,7 +3742,7 @@ function renderSplitContent() {
             onclick="toggleSplitFamily(${fi})">
             <div>
               <span style="font-weight:700;font-size:13px">${esc(f.name)}</span>
-              <span style="font-size:10px;background:var(--teal-light);color:var(--teal);padding:1px 6px;border-radius:10px;margin-left:4px">${f.groupSub || ({'family':'가문','guild':'길드','knight':'기사단','crime_f':'범죄조직','religion':'종교','academic':'학술','politics':'정치','corp':'기업','school':'학교','crime_m':'범죄조직','media':'미디어','military':'군사','politics_m':'정치','korean':'한국풍','chinese':'중국풍','japanese':'일본풍','other':'기타'}[f.groupType||'family']||'가문')}</span>
+              <span style="font-size:10px;background:var(--teal-light);color:var(--teal);padding:1px 6px;border-radius:10px;margin-left:4px">${({'family':'가문','guild':'길드','knight':'기사단','crime_f':'범죄조직','religion':'종교','academic':'학술','politics':'정치','corp':'기업','school':'학교','crime_m':'범죄조직','media':'미디어','military':'군사','politics_m':'정치','korean':'한국풍','chinese':'중국풍','japanese':'일본풍','other':'기타'}[f.groupType||'family']||'가문')}</span>
               ${f.rank?`<span style="font-size:10px;color:var(--muted);margin-left:4px">${esc(f.rank)}</span>`:''}
               <span style="font-size:10px;color:var(--muted);margin-left:6px">${Object.values(f.groups||{}).reduce((a,g)=>a+(g||[]).length,0)}명</span>
             </div>
@@ -4781,7 +4816,7 @@ function renderFamily() {
             ${isChild?`<span style="font-size:12px;color:${f.color||'var(--gold)'};font-weight:700">└</span>`:''}
             <span style="font-size:11px;color:var(--muted);transition:transform .2s;display:inline-block;transform:rotate(${collapsed?'-90':'0'}deg)">▾</span>
             <span class="font-display" style="font-size:${isChild?'15':'17'}px">${esc(f.name)}</span>
-            <span class="tag" style="background:var(--teal-light);color:var(--teal);border-color:var(--teal)">${f.groupSub || ({'family':'가문','guild':'길드','knight':'기사단','crime_f':'범죄조직','religion':'종교','academic':'학술','politics':'정치','corp':'기업','school':'학교','crime_m':'범죄조직','media':'미디어','military':'군사','politics_m':'정치','korean':'한국풍','chinese':'중국풍','japanese':'일본풍','other':'기타'}[f.groupType||'family']||'가문')}</span>
+            <span class="tag" style="background:var(--teal-light);color:var(--teal);border-color:var(--teal)">${({'family':'가문','guild':'길드','knight':'기사단','crime_f':'범죄조직','religion':'종교','academic':'학술','politics':'정치','corp':'기업','school':'학교','crime_m':'범죄조직','media':'미디어','military':'군사','politics_m':'정치','korean':'한국풍','chinese':'중국풍','japanese':'일본풍','other':'기타'}[f.groupType||'family']||'가문')}</span>
             ${f.rank?`<span class="tag">${esc(f.rank)}</span>`:''}
             ${totalMembers>0?`<span style="font-size:11px;color:var(--muted)">${totalMembers}명</span>`:''}
           </div>
@@ -4829,7 +4864,7 @@ function renderFamily() {
         <h2 class="font-display" style="font-size:22px">가문 및 집단 (${families.length})</h2>
         <button class="btn btn-gold" onclick="showFamilyModal()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          가문 추가
+          추가
         </button>
       </div>
       ${familyCards}
