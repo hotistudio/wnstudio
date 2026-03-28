@@ -23,6 +23,48 @@
   --muted:#7a6e5f; --border:#ddd3be; --shadow:rgba(24,18,10,.1);
   --sidebar:240px; --header:52px;
 }
+/* 빨강 */
+[data-color-theme="red"]{
+  --paper:#fff8f8; --cream:#ffe8e8; --gold:#c43a3a; --gold2:#e87070;
+  --gold-light:#fff0f0; --teal:#8b2020; --teal2:#b53030; --teal-light:#fde0e0;
+  --border:#f0c8c8; --muted:#8a6060; --shadow:rgba(180,40,40,.08);
+}
+/* 주황 */
+[data-color-theme="orange"]{
+  --paper:#fff9f5; --cream:#ffe8d6; --gold:#c4622a; --gold2:#e8904a;
+  --gold-light:#fff3ec; --teal:#7a3a10; --teal2:#a85020; --teal-light:#fde8d8;
+  --border:#f0cdb0; --muted:#8a6848; --shadow:rgba(180,80,20,.08);
+}
+/* 노랑 (기본) */
+[data-color-theme="yellow"]{
+  --paper:#faf7f2; --cream:#f0e9d8; --gold:#c4922a; --gold2:#e8bc5c;
+  --gold-light:#fff8ee; --teal:#235f62; --teal2:#2d8285; --teal-light:#e8f4f4;
+  --border:#ddd3be; --muted:#7a6e5f; --shadow:rgba(24,18,10,.1);
+}
+/* 초록 */
+[data-color-theme="green"]{
+  --paper:#f6faf6; --cream:#dff0df; --gold:#2a7a3a; --gold2:#4aaa5a;
+  --gold-light:#edfaed; --teal:#1a5a30; --teal2:#2a7a45; --teal-light:#d8f0e0;
+  --border:#b8dfc0; --muted:#507860; --shadow:rgba(20,100,40,.08);
+}
+/* 파랑 */
+[data-color-theme="blue"]{
+  --paper:#f5f8ff; --cream:#dde8ff; --gold:#2a52c4; --gold2:#5080e8;
+  --gold-light:#eef2ff; --teal:#1a2f80; --teal2:#2a45b0; --teal-light:#d8e2ff;
+  --border:#b8caee; --muted:#506090; --shadow:rgba(20,40,160,.08);
+}
+/* 남색 */
+[data-color-theme="navy"]{
+  --paper:#f5f6fa; --cream:#dde0f0; --gold:#2a2a8a; --gold2:#5050b8;
+  --gold-light:#eeeeff; --teal:#18185a; --teal2:#282890; --teal-light:#d8d8f0;
+  --border:#b8b8d8; --muted:#505080; --shadow:rgba(20,20,120,.08);
+}
+/* 보라 */
+[data-color-theme="purple"]{
+  --paper:#f8f5ff; --cream:#ead8ff; --gold:#7a2ac4; --gold2:#a050e8;
+  --gold-light:#f5eeff; --teal:#4a1080; --teal2:#6a28b0; --teal-light:#e0d0f8;
+  --border:#cbb8e8; --muted:#705090; --shadow:rgba(80,20,160,.08);
+}
 [data-theme="dark"]{
   --ink:#e8e0d4; --paper:#1a1612; --cream:#231f1b; --white:#252017;
   --gold:#e8bc5c; --gold2:#f5d080; --gold-light:#2a2310;
@@ -533,6 +575,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
     <div id="header-spacer"></div>
     <div id="header-actions" style="display:flex;align-items:center;gap:4px;flex-shrink:0">
       <button class="header-btn" onclick="toggleDarkMode()" id="btn-darkmode" title="다크모드 전환" style="font-size:16px;padding:5px 8px">🌙</button>
+      <button class="header-btn" onclick="toggleThemePicker()" id="btn-theme" title="테마 색상" style="font-size:16px;padding:5px 8px">🎨</button>
       <button class="header-btn" id="fs-status-btn" onclick="fsConnect()" title="로컬 파일에 자동저장" style="font-size:11px;padding:5px 8px">💾 파일 연결</button>
       <button class="header-btn" onclick="showExportModal()" id="btn-export" style="display:none">📤 <span class="btn-text">내보내기</span></button>
       <button class="header-btn" onclick="document.getElementById('import-file').click()" id="btn-import" style="display:none">📂 <span class="btn-text">불러오기</span></button>
@@ -5516,6 +5559,69 @@ function showSavedBanner(success=true) {
 
 
 // ═══════════════════════════════════════════════════════════
+// 컬러 테마
+const COLOR_THEMES = [
+  { id:'yellow', label:'노랑', color:'#c4922a' },
+  { id:'red',    label:'빨강', color:'#c43a3a' },
+  { id:'orange', label:'주황', color:'#c4622a' },
+  { id:'green',  label:'초록', color:'#2a7a3a' },
+  { id:'blue',   label:'파랑', color:'#2a52c4' },
+  { id:'navy',   label:'남색', color:'#2a2a8a' },
+  { id:'purple', label:'보라', color:'#7a2ac4' },
+];
+
+function applyColorTheme(id) {
+  document.documentElement.setAttribute('data-color-theme', id);
+  localStorage.setItem('wnstudio_color_theme', id);
+  // 피커 닫기
+  document.getElementById('theme-picker-popup')?.remove();
+}
+
+function toggleThemePicker() {
+  const existing = document.getElementById('theme-picker-popup');
+  if (existing) { existing.remove(); return; }
+  const btn = document.getElementById('btn-theme');
+  const rect = btn.getBoundingClientRect();
+  const cur = localStorage.getItem('wnstudio_color_theme') || 'yellow';
+  const popup = document.createElement('div');
+  popup.id = 'theme-picker-popup';
+  popup.style.cssText = `position:fixed;top:${rect.bottom+6}px;right:${window.innerWidth-rect.right}px;
+    background:var(--paper);border:1.5px solid var(--border);border-radius:14px;
+    padding:14px 16px;z-index:9999;box-shadow:0 8px 32px var(--shadow);min-width:200px`;
+  popup.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:12px;letter-spacing:.5px">테마 색상</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${COLOR_THEMES.map(t => `
+        <button onclick="applyColorTheme('${t.id}')"
+          style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;
+            border:1.5px solid ${cur===t.id?'var(--gold)':'var(--border)'};
+            background:${cur===t.id?'var(--gold-light)':'transparent'};
+            cursor:pointer;font-family:'Noto Sans KR',sans-serif;
+            font-size:13px;font-weight:${cur===t.id?'700':'400'};color:var(--ink);
+            transition:all .15s;text-align:left;width:100%">
+          <span style="width:22px;height:22px;border-radius:50%;background:${t.color};
+            display:inline-block;flex-shrink:0;border:2px solid rgba(0,0,0,.08)"></span>
+          ${t.label}
+          ${cur===t.id?'<span style="margin-left:auto;color:var(--gold)">✓</span>':''}
+        </button>`).join('')}
+    </div>`;
+  document.body.appendChild(popup);
+  // 외부 클릭 시 닫기
+  setTimeout(() => {
+    document.addEventListener('click', function handler(e) {
+      if (!popup.contains(e.target) && e.target !== btn) {
+        popup.remove();
+        document.removeEventListener('click', handler);
+      }
+    });
+  }, 10);
+}
+
+function initColorTheme() {
+  const saved = localStorage.getItem('wnstudio_color_theme') || 'yellow';
+  document.documentElement.setAttribute('data-color-theme', saved);
+}
+
 // 다크모드
 // ═══════════════════════════════════════════════════════════
 function initDarkMode() {
@@ -6706,6 +6812,7 @@ function deleteFamilyMember(fi, mi) {
 // ═══════════════════════════════════════════════════════════════
 loadFromStorage();
 initDarkMode();
+initColorTheme();
 applyEditorFontSize();
 renderHome();
 history.replaceState({screen:'home'}, '');
