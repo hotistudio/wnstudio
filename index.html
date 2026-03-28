@@ -559,7 +559,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 <div id="app">
   <!-- HEADER -->
   <header id="header">
-    <button id="header-title" onclick="goHome()">호트 웹소설 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.3.3</span></button>
+    <button id="header-title" onclick="goHome()">호트 웹소설 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.4.1</span></button>
     <button class="header-btn" id="menu-toggle" onclick="toggleSidebar()" style="display:none;padding:6px 8px">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- 왼쪽 세로선 -->
@@ -2406,31 +2406,42 @@ function chMouseMove(e) { if (_chDrag) chDragMove(e.clientY); }
 function chDragMove(clientY) {
   const { ghost, offsetY } = _chDrag;
   ghost.style.top = (clientY - offsetY) + 'px';
-  // 드롭 타깃 하이라이트
+
   document.querySelectorAll('.ch-drag-item').forEach(r => r.style.borderTop = '');
-  document.querySelectorAll('.ch-folder-body,.chapter-list-body').forEach(b => b.style.outline = '');
+
   const items = [...document.querySelectorAll('.ch-drag-item')];
-  let targetChid = null, insertBefore = null;
-  for (let i = 0; i < items.length; i++) {
-    const r = items[i].getBoundingClientRect();
-    if (clientY < r.top + r.height / 2) {
-      if (items[i] !== _chDrag.el) {
-        items[i].style.borderTop = '2px solid var(--gold)';
-        insertBefore = items[i].dataset.chid;
-      }
+  // 드래그 중인 아이템 제외
+  const others = items.filter(el => el !== _chDrag.el);
+
+  let insertBefore = '__end__';
+  for (let i = 0; i < others.length; i++) {
+    const r = others[i].getBoundingClientRect();
+    const mid = r.top + r.height / 2;
+    if (clientY < mid) {
+      insertBefore = others[i].dataset.chid;
+      others[i].style.borderTop = '2px solid var(--gold)';
       break;
     }
-    if (i === items.length - 1) insertBefore = '__end__';
   }
-  // 폴더 하이라이트
+
+  // 폴더 감지: 화가 없는 폴더 위에 있을 때만
   let targetFolder = null;
-  document.querySelectorAll('.ch-folder').forEach(f => {
-    const r = f.getBoundingClientRect();
-    if (clientY >= r.top && clientY <= r.bottom) targetFolder = f.dataset.folderid;
-  });
+  if (insertBefore === '__end__') {
+    document.querySelectorAll('.ch-folder').forEach(f => {
+      const body = f.querySelector('.ch-folder-body');
+      if (!body) return; // 접혀있으면 무시
+      const fChapters = body.querySelectorAll('.ch-drag-item');
+      if (fChapters.length === 0) {
+        const r = f.getBoundingClientRect();
+        if (clientY >= r.top && clientY <= r.bottom) targetFolder = f.dataset.folderid;
+      }
+    });
+  }
+
   _chDrag.insertBefore = insertBefore;
   _chDrag.targetFolder = targetFolder;
 }
+
 function chTouchEnd() { document.removeEventListener('touchmove', chTouchMove); chDragCommit(); }
 function chMouseEnd() { document.removeEventListener('mousemove', chMouseMove); chDragCommit(); }
 function chDragCommit() {
@@ -2446,40 +2457,26 @@ function chDragCommit() {
   const fromIdx = chapters.findIndex(c => c.id === chid);
   if (fromIdx === -1) { renderChapters(); return; }
 
-  // 폴더 변경 + 순서 이동
-  if (targetFolder !== undefined && targetFolder !== null) {
-    // 폴더로 드래그 → folderId 변경 + 해당 폴더의 마지막으로 이동
+  if (targetFolder) {
+    // 빈 폴더로 드래그
     chapters[fromIdx].folderId = targetFolder;
-    // 해당 폴더의 마지막 화 인덱스 찾기
-    const folderChIds = chapters
-      .map((c, i) => ({c, i}))
-      .filter(({c, i}) => c.folderId === targetFolder && i !== fromIdx)
-      .map(({i}) => i);
-    const lastFolderIdx = folderChIds.length > 0 ? Math.max(...folderChIds) : -1;
-    if (lastFolderIdx !== -1 && lastFolderIdx !== fromIdx) {
-      const [item] = chapters.splice(fromIdx, 1);
-      const newLast = chapters.map((c, i) => ({c, i}))
-        .filter(({c}) => c.folderId === targetFolder)
-        .map(({i}) => i);
-      const insertAt = newLast.length > 0 ? Math.max(...newLast) + 1 : fromIdx;
-      chapters.splice(insertAt, 0, item);
-    }
-  } else if (insertBefore && insertBefore !== '__end__') {
-    // insertBefore 위치의 화와 같은 폴더로
-    const targetCh = chapters.find(c => c.id === insertBefore);
-    if (targetCh) {
-      if (targetCh.folderId) chapters[fromIdx].folderId = targetCh.folderId;
-      else delete chapters[fromIdx].folderId;
-    }
-    // 순서 변경
-    const toIdx = chapters.findIndex(c => c.id === insertBefore);
-    if (toIdx !== -1 && toIdx !== fromIdx) {
-      const [item] = chapters.splice(fromIdx, 1);
-      const newTo = chapters.findIndex(c => c.id === insertBefore);
-      chapters.splice(newTo, 0, item);
-    }
-  } else if (insertBefore === '__end__') {
     const [item] = chapters.splice(fromIdx, 1);
+    chapters.push(item);
+  } else if (insertBefore && insertBefore !== '__end__') {
+    const toIdx = chapters.findIndex(c => c.id === insertBefore);
+    if (toIdx === -1) { renderChapters(); return; }
+    // 폴더는 드롭 위치의 화 기준으로 설정
+    const targetCh = chapters[toIdx];
+    if (targetCh.folderId) chapters[fromIdx].folderId = targetCh.folderId;
+    else delete chapters[fromIdx].folderId;
+    // 순서 이동
+    const [item] = chapters.splice(fromIdx, 1);
+    const newTo = chapters.findIndex(c => c.id === insertBefore);
+    chapters.splice(newTo, 0, item);
+  } else {
+    // 맨 끝으로
+    const [item] = chapters.splice(fromIdx, 1);
+    // 같은 폴더 유지 or 폴더 없음
     chapters.push(item);
   }
 
