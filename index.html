@@ -59,6 +59,11 @@ html,body{height:100%;overflow:hidden;background:var(--paper);color:var(--ink);
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:var(--cream)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.split-panel-tabs::-webkit-scrollbar{height:8px}
+.split-panel-tabs::-webkit-scrollbar-track{background:var(--cream)}
+.split-panel-tabs::-webkit-scrollbar-thumb{background:var(--muted);border-radius:4px}
+#focus-ref-panel .split-panel-tabs::-webkit-scrollbar{height:8px}
+#focus-ref-panel .split-panel-tabs::-webkit-scrollbar-thumb{background:var(--muted);border-radius:4px}
 
 /* ═══ TYPOGRAPHY ═══════════════════════════════════════════ */
 .font-display{font-family:'Black Han Sans',sans-serif}
@@ -2007,7 +2012,7 @@ function renderChapters() {
     </div>`;
   const prevScroll = document.getElementById('chapter-list-body')?.scrollTop || 0;
   setTimeout(() => {
-    refreshShortcutBar(); applyEditorFontSize(); initChDrag();
+    refreshShortcutBar(); applyEditorFontSize(); initChDrag(); initAllDragScrolls();
     const listBody = document.getElementById('chapter-list-body');
     if (listBody) listBody.scrollTop = prevScroll;
   }, 0);
@@ -2274,6 +2279,47 @@ function deleteFolder(fid) {
 
 // 화 드래그 앤 드롭
 let _chDrag = null;
+
+function initDragScroll(el) {
+  if (!el || el._dragScroll) return;
+  el._dragScroll = true;
+  el.style.cursor = 'grab';
+
+  let startX, scrollLeft, dragging = false, moved = false;
+
+  el.addEventListener('mousedown', e => {
+    dragging = true; moved = false;
+    startX = e.clientX;
+    scrollLeft = el.scrollLeft;
+    el.style.cursor = 'grabbing';
+    e.preventDefault(); // 텍스트 선택 방지
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    if (Math.abs(dx) > 3) moved = true;
+    if (moved) el.scrollLeft = scrollLeft - dx;
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    el.style.cursor = 'grab';
+  });
+
+  // 드래그 후 탭 클릭 방지
+  el.addEventListener('click', e => {
+    if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; }
+  }, true);
+}
+
+function initAllDragScrolls() {
+  document.querySelectorAll('.split-panel-tabs').forEach(el => {
+    el._dragScroll = false; // 재초기화 허용
+    initDragScroll(el);
+  });
+}
 
 function initChDrag() {
   document.querySelectorAll('.ch-drag-handle').forEach(h => {
@@ -4306,6 +4352,7 @@ function toggleSplitPanel() {
       panel.addEventListener('touchend',   panel._swipeEnd,   {passive:true});
     }
     renderSplitContent();
+    setTimeout(initAllDragScrolls, 50);
   } else {
     panel.classList.add('hidden');
     if (btn) { btn.style.background=''; btn.style.borderColor=''; btn.style.color=''; btn.textContent='⊞ 참고'; }
@@ -4764,10 +4811,13 @@ function toggleFocusRef() {
 let _focusRefTab = 'overview';
 function focusRefTab(tab) {
   _focusRefTab = tab;
+  const tabLabelMap = {
+    overview:'개요', world:'세계관', plot:'플롯',
+    characters:'인물', family:'가문', items:'아이템', memo:'메모'
+  };
+  const label = tabLabelMap[tab];
   document.querySelectorAll('#focus-ref-panel .split-tab').forEach(b => {
-    b.classList.toggle('active', b.textContent.includes(
-      {overview:'개요', world:'세계관', plot:'플롯', characters:'인물', family:'가문'}[tab] || ''
-    ));
+    b.classList.toggle('active', !!label && b.textContent.trim().includes(label));
   });
   // 기존 renderSplitContent 로직 재활용
   const prevTab = splitTab;
@@ -4775,7 +4825,6 @@ function focusRefTab(tab) {
   const el = document.getElementById('focus-ref-content');
   if (el) {
     const prevEl = document.getElementById('split-content');
-    // 임시로 split-content를 focus-ref-content로 교체
     if (prevEl) prevEl.id = 'split-content-bak';
     el.id = 'split-content';
     renderSplitContent();
@@ -5633,17 +5682,17 @@ async function fsReconnect() {}
 
 
 const CHAR_COLORS = [
-  {v:'#f5e6d3',label:'크림'},{v:'#fde8e8',label:'분홍'},
-  {v:'#e8f5e9',label:'민트'},{v:'#e3f2fd',label:'하늘'},
-  {v:'#f3e5f5',label:'라벤더'},{v:'#fff9e6',label:'노랑'},
-  {v:'#e0f7fa',label:'청록'},{v:'#fce4ec',label:'로즈'},
-  {v:'#e8eaf6',label:'인디고'},{v:'#f1f8e9',label:'연두'},
-  {v:'#fff3e0',label:'오렌지'},{v:'#e0f2f1',label:'에메랄드'},
+  {v:'#ffcccc',label:'빨강'},
+  {v:'#ffd9b3',label:'주황'},
+  {v:'#fff0a3',label:'노랑'},
+  {v:'#b3f0b3',label:'초록'},
+  {v:'#b3d9ff',label:'파랑'},
+  {v:'#c2b3ff',label:'남색'},
+  {v:'#e0b3ff',label:'보라'},
 ];
 // 소속별 자동 색상
 const GROUP_AUTO_COLORS = [
-  '#fde8e8','#e3f2fd','#e8f5e9','#f3e5f5','#fff9e6',
-  '#e0f7fa','#fce4ec','#f1f8e9','#fff3e0','#e0f2f1',
+  '#ffcccc','#ffd9b3','#fff0a3','#b3f0b3','#b3d9ff','#c2b3ff','#e0b3ff',
 ];
 
 
@@ -6472,7 +6521,7 @@ function showFamilyModal(idx) {
     <div style="margin-bottom:12px"><label class="label">상위 가문/집단 (선택)</label>
       <select id="fm-parent">
         <option value="">없음 (독립)</option>
-        ${(p.families||[]).filter((_,i)=>i!==(idx)).map((pf,pi)=>`<option value="${esc(pf.name)}" ${(f.parentName===pf.name)?'selected':''}>${esc(pf.name)}</option>`).join('')}
+        ${(p.families||[]).filter((pf,i) => i !== idx && pf.name !== f.name).map(pf=>`<option value="${esc(pf.name)}" ${(f.parentName===pf.name)?'selected':''}>${esc(pf.name)}</option>`).join('')}
       </select></div>
     <div style="margin-bottom:12px"><label class="label">등급/직위</label>
       <input id="fm-rank" value="${esc(f.rank||'')}" placeholder="예: 공작가, 1등급, 최상위"></div>
@@ -6511,6 +6560,7 @@ function saveFamily(idx) {
     description: document.getElementById('fm-desc').value,
     color: document.querySelector('#fm-color-group [data-selected]')?.dataset?.val || '#c4922a',
     members: idx!==undefined ? p.families[idx].members||[] : [],
+    groups: idx!==undefined ? p.families[idx].groups||{} : {},
   };
   if (idx!==undefined) p.families[idx]=f; else p.families.push(f);
   autoSave(); closeModal(); renderFamily();
