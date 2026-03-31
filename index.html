@@ -6337,61 +6337,130 @@ function renderForeshadow() {
   if (!p) return;
   if (!p.foreshadows) p.foreshadows = [];
   const list = p.foreshadows;
-  if (!window._fsFilter) window._fsFilter = '전체';
-  const filter = window._fsFilter;
-  const STATUS = ['미회수','회수완료','삭제됨'];
-  const STATUS_COLOR = {'미회수':'var(--gold)','회수완료':'var(--teal)','삭제됨':'var(--muted)'};
-  const STATUS_BG = {'미회수':'var(--gold-light)','회수완료':'var(--teal-light)','삭제됨':'var(--cream)'};
+  if (!window._fsFilter)     window._fsFilter = '전체';
+  if (!window._fsCharFilter) window._fsCharFilter = '전체';
+  const filter     = window._fsFilter;
+  const charFilter = window._fsCharFilter;
 
-  const filtered = filter === '전체' ? list : list.filter(f => f.status === filter);
+  const STATUS_COLOR = {'미회수':'var(--gold)','회수완료':'var(--teal)','삭제됨':'var(--muted)'};
+  const STATUS_BG    = {'미회수':'var(--gold-light)','회수완료':'var(--teal-light)','삭제됨':'var(--cream)'};
+  const IMP_COLOR    = {'★★★ 핵심':'var(--rust)','★★ 중요':'var(--gold)','★ 일반':'var(--muted)'};
+
+  // 회수율 계산
+  const total = list.length;
+  const done  = list.filter(f=>f.status==='회수완료').length;
+  const pct   = total ? Math.round(done/total*100) : 0;
+
+  // 필터링
+  let filtered = filter==='전체' ? list : list.filter(f=>f.status===filter);
+  if (charFilter!=='전체') filtered = filtered.filter(f=>(f.chars||'').split(',').map(s=>s.trim()).includes(charFilter));
+
+  // 인물 목록 (복선에 등장하는 인물만)
+  const usedChars = [...new Set(list.flatMap(f=>(f.chars||'').split(',').map(s=>s.trim()).filter(Boolean)))].sort();
+
+  // 태그 목록
+  const allTags = [...new Set(list.flatMap(f=>(f.tags||'').split(',').map(s=>s.trim()).filter(Boolean)))].sort();
 
   document.getElementById('main').innerHTML = `
     <div style="max-width:800px;margin:0 auto">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div class="font-display" style="font-size:22px">복선 관리 (${list.length})</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="font-display" style="font-size:22px">복선 관리 (${total})</div>
         <button class="btn btn-gold" onclick="showForeshadowModal()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           복선 추가
         </button>
       </div>
-      <!-- 필터 -->
-      <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
-        ${['전체','미회수','회수완료','삭제됨'].map(s => `
+
+      <!-- 회수율 -->
+      ${total > 0 ? `
+      <div class="card" style="margin-bottom:14px;padding:12px 16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700;color:var(--muted)">회수율</span>
+          <span style="font-size:13px;font-weight:700;color:var(--teal)">${done}/${total} (${pct}%)</span>
+        </div>
+        <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:var(--teal);border-radius:4px;transition:width .5s"></div>
+        </div>
+      </div>` : ''}
+
+      <!-- 상태 필터 -->
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">
+        ${['전체','미회수','회수완료','삭제됨'].map(s=>`
           <button onclick="window._fsFilter='${s}';renderForeshadow()"
-            style="padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;
+            style="padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;
               font-family:'Noto Sans KR',sans-serif;transition:all .15s;
               border:1.5px solid ${filter===s?'var(--gold)':'var(--border)'};
               background:${filter===s?'var(--gold)':'transparent'};
               color:${filter===s?'#fff':'var(--muted)'}">
-            ${s} <span style="opacity:.7">(${s==='전체'?list.length:list.filter(f=>f.status===s).length})</span>
+            ${s} <span style="opacity:.7">(${s==='전체'?total:list.filter(f=>f.status===s).length})</span>
           </button>`).join('')}
       </div>
+
+      <!-- 인물 필터 -->
+      ${usedChars.length > 0 ? `
+      <div style="display:flex;gap:5px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:14px;
+        padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+        <span style="font-size:11px;color:var(--muted);flex-shrink:0;font-weight:600;line-height:2.2">👤</span>
+        <button onclick="window._fsCharFilter='전체';renderForeshadow()"
+          style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;
+            flex-shrink:0;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;
+            border:1.5px solid ${charFilter==='전체'?'var(--teal)':'var(--border)'};
+            background:${charFilter==='전체'?'var(--teal)':'transparent'};
+            color:${charFilter==='전체'?'#fff':'var(--muted)'}">전체</button>
+        ${usedChars.map(c=>`
+          <button onclick="window._fsCharFilter='${esc(c)}';renderForeshadow()"
+            style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;
+              flex-shrink:0;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;
+              border:1.5px solid ${charFilter===c?'var(--teal)':'var(--border)'};
+              background:${charFilter===c?'var(--teal)':'transparent'};
+              color:${charFilter===c?'#fff':'var(--muted)'}">${esc(c)}</button>`).join('')}
+      </div>` : '<div style="margin-bottom:14px"></div>'}
+
+      <!-- 카드 목록 -->
       ${filtered.length === 0
-        ? `<div class="card empty-state"><div class="emoji">🎯</div><p>${filter==='전체'?'복선을 추가해보세요.':filter+' 복선이 없어요.'}</p></div>`
-        : filtered.map((f, i) => {
+        ? `<div class="card empty-state"><div class="emoji">🎯</div><p>${total===0?'복선을 추가해보세요.':'해당하는 복선이 없어요.'}</p></div>`
+        : filtered.map(f => {
           const idx = list.indexOf(f);
-          const st = f.status || '미회수';
+          const st  = f.status || '미회수';
+          const imp = f.importance || '';
+          const tags = (f.tags||'').split(',').map(s=>s.trim()).filter(Boolean);
           return `
           <div class="card" style="margin-bottom:12px;border-left:4px solid ${STATUS_COLOR[st]}">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-              <div style="flex:1">
-                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+              <div style="flex:1;min-width:0">
+                <!-- 뱃지 행 -->
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
                   <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;
                     background:${STATUS_BG[st]};color:${STATUS_COLOR[st]}">${st}</span>
+                  ${imp?`<span style="font-size:11px;font-weight:700;color:${IMP_COLOR[imp]||'var(--muted)'}">${imp}</span>`:''}
+                  ${tags.map(t=>`<span style="font-size:11px;padding:1px 8px;border-radius:20px;
+                    background:var(--cream);color:var(--muted);font-weight:600">#${esc(t)}</span>`).join('')}
                   ${f.chars?`<span style="font-size:11px;color:var(--muted)">👤 ${esc(f.chars)}</span>`:''}
                 </div>
-                <div style="font-size:14px;font-weight:600;margin-bottom:6px;white-space:pre-wrap">${esc(f.content||'')}</div>
-                <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)">
-                  ${f.plant?`<span>🌱 뿌린 곳: <b style="color:var(--ink)">${esc(f.plant)}</b></span>`:''}
-                  ${f.harvest?`<span>✅ 회수: <b style="color:var(--ink)">${esc(f.harvest)}</b></span>`:''}
-                </div>
+                <!-- 복선 내용 -->
+                <div style="font-size:14px;font-weight:600;margin-bottom:8px;white-space:pre-wrap">${esc(f.content||'')}</div>
+                <!-- 뿌린 화 → 회수 화 연결 -->
+                ${(f.plant||f.harvest) ? `
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                  background:var(--cream);border-radius:8px;padding:6px 10px;font-size:12px">
+                  <span style="color:var(--muted)">🌱</span>
+                  <span style="font-weight:600;color:var(--ink)">${esc(f.plant||'?')}</span>
+                  <span style="color:var(--border);font-size:16px">→→→</span>
+                  <span style="font-weight:600;color:${st==='회수완료'?'var(--teal)':'var(--ink)'}">${esc(f.harvest||(st==='미회수'?'미회수':'?'))}</span>
+                  ${st==='회수완료'?'<span style="color:var(--teal)">✅</span>':''}
+                </div>` : ''}
+                <!-- 힌트/메모 -->
+                ${f.hint?`<div style="font-size:12px;color:var(--muted);font-style:italic;
+                  border-left:3px solid var(--border);padding-left:8px;white-space:pre-wrap">💡 ${esc(f.hint)}</div>`:''}
               </div>
-              <div style="display:flex;gap:6px;flex-shrink:0">
-                <button onclick="showForeshadowModal(${idx})" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)" title="수정">✏️</button>
-                <button onclick="deleteForeshadow(${idx})" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--rust)" title="삭제">✕</button>
+              <div style="display:flex;gap:4px;flex-shrink:0">
+                <button onclick="showForeshadowModal(${idx})"
+                  style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✏️</button>
+                <button onclick="deleteForeshadow(${idx})"
+                  style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--rust)">✕</button>
               </div>
             </div>
-          </div>`}).join('')}
+          </div>`;}).join('')}
     </div>`;
 }
 
@@ -6400,9 +6469,10 @@ function showForeshadowModal(idx) {
   const f = idx !== undefined ? p.foreshadows[idx] : {};
   const chars = p.characters || [];
   const STATUS = ['미회수','회수완료','삭제됨'];
+  const IMP = ['','★ 일반','★★ 중요','★★★ 핵심'];
   showModal(`
     <div class="modal-title">${idx !== undefined ? '복선 수정' : '복선 추가'}</div>
-    <div class="form-grid" style="grid-template-columns:1fr">
+    <div class="form-grid">
       <div class="full"><label class="label">복선 내용 *</label>
         <textarea id="fs-content" rows="3" placeholder="어떤 복선인지 적어주세요">${esc(f.content||'')}</textarea></div>
       <div><label class="label">뿌린 화/장면</label>
@@ -6410,7 +6480,13 @@ function showForeshadowModal(idx) {
       <div><label class="label">회수 화/장면</label>
         <input id="fs-harvest" value="${esc(f.harvest||'')}" placeholder="예: 15화"></div>
       <div><label class="label">상태</label>
-        <select id="fs-status">${STATUS.map(s=>`<option value="${s}" ${f.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+        <select id="fs-status">${STATUS.map(s=>`<option value="${s}" ${(f.status||'미회수')===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div><label class="label">중요도</label>
+        <select id="fs-importance">${IMP.map(s=>`<option value="${s}" ${(f.importance||'')===s?'selected':''}>${s||'없음'}</option>`).join('')}</select></div>
+      <div class="full"><label class="label">태그 <span style="font-size:11px;color:var(--muted)">(쉼표로 구분)</span></label>
+        <input id="fs-tags" value="${esc(f.tags||'')}" placeholder="예: 정체, 마법, 가족"></div>
+      <div class="full"><label class="label">힌트/메모</label>
+        <textarea id="fs-hint" rows="2" placeholder="이 복선을 어떻게 회수할지, 관련 아이디어...">${esc(f.hint||'')}</textarea></div>
       <div class="full"><label class="label">관련 인물</label>
         ${chars.length===0
           ? `<input id="fs-chars" value="${esc(f.chars||'')}" placeholder="예: 영희, 철수">`
@@ -6436,6 +6512,7 @@ function showForeshadowModal(idx) {
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
       <button class="btn btn-gold" onclick="saveForeshadow(${idx})">저장</button>
     </div>`);
+  setTimeout(()=>document.getElementById('fs-content')?.focus(),100);
 }
 
 function saveForeshadow(idx) {
@@ -6447,9 +6524,14 @@ function saveForeshadow(idx) {
   const chars = checked || (document.getElementById('fs-chars')?.value||'');
   const f = {
     id: idx !== undefined ? p.foreshadows[idx].id : uid(),
-    content, plant: document.getElementById('fs-plant').value,
-    harvest: document.getElementById('fs-harvest').value,
-    status: document.getElementById('fs-status').value, chars
+    content,
+    plant:      document.getElementById('fs-plant').value,
+    harvest:    document.getElementById('fs-harvest').value,
+    status:     document.getElementById('fs-status').value,
+    importance: document.getElementById('fs-importance').value,
+    tags:       document.getElementById('fs-tags').value,
+    hint:       document.getElementById('fs-hint').value,
+    chars
   };
   if (idx !== undefined) p.foreshadows[idx] = f;
   else p.foreshadows.push(f);
