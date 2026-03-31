@@ -5232,6 +5232,43 @@ function enterFocusMode() {
   if (sizeDisplay) sizeDisplay.textContent = editorFontSize + 'px';
   focusEditor.style.fontSize = editorFontSize + 'px';
 
+  // 집중 모드 단축키 바 초기화
+  const focusShortcutBar = document.getElementById('focus-shortcut-bar');
+  if (focusShortcutBar) {
+    focusShortcutBar.innerHTML = '';
+    const label = document.createElement('span');
+    label.style.cssText = 'font-size:11px;color:var(--muted);font-weight:600;flex-shrink:0';
+    label.textContent = '단축키';
+    focusShortcutBar.appendChild(label);
+    Object.entries(SHORTCUT_SYMBOLS).forEach(([k, sym]) => {
+      if (!sym) return;
+      const btn = document.createElement('button');
+      btn.className = 'sym-btn';
+      btn.style.cssText = 'font-size:13px;min-width:32px;height:32px;padding:0 6px';
+      btn.title = `^${k}`;
+      btn.textContent = sym;
+      btn.onclick = () => {
+        const fe = document.getElementById('focus-editor');
+        if (!fe) return;
+        const s = fe.selectionStart, e = fe.selectionEnd;
+        const selected = fe.value.slice(s, e);
+        const isPair = sym.length === 2;
+        if (isPair) {
+          const inner = selected || '';
+          fe.value = fe.value.slice(0,s) + sym[0] + inner + sym[1] + fe.value.slice(e);
+          fe.selectionStart = fe.selectionEnd = inner ? s+1 : s+1;
+          if (inner) { fe.selectionStart = s+1; fe.selectionEnd = s+1+inner.length; }
+        } else {
+          fe.value = fe.value.slice(0,s) + sym + fe.value.slice(e);
+          fe.selectionStart = fe.selectionEnd = s + sym.length;
+        }
+        fe.focus();
+        fe.dispatchEvent(new Event('input', {bubbles:true}));
+      };
+      focusShortcutBar.appendChild(btn);
+    });
+  }
+
   // 오버레이 열기
   const overlay = document.getElementById('focus-overlay');
   overlay.classList.add('active');
@@ -7716,6 +7753,8 @@ document.addEventListener('visibilitychange', () => {
       <button id="focus-exit-btn" onclick="exitFocusMode()">✕ 나가기 (ESC)</button>
     </div>
   </div>
+  <div id="focus-shortcut-bar" style="padding:5px 12px;background:var(--cream);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:4px;flex-wrap:wrap;flex-shrink:0"></div>
   <div style="display:flex;flex:1;overflow:hidden">
     <div id="focus-editor-wrap" style="flex:1;overflow-y:auto;display:flex;justify-content:center;padding:40px 24px">
       <textarea id="focus-editor" placeholder="이야기를 시작하세요..."></textarea>
