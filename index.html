@@ -660,6 +660,14 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           심리 아크 <span class="nav-badge" id="badge-psyarc"></span>
         </button>
+        <button class="nav-item" onclick="navigate('foreshadow')" data-tab="foreshadow">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+          복선 관리 <span class="nav-badge" id="badge-foreshadow"></span>
+        </button>
+        <button class="nav-item" onclick="navigate('chronicle')" data-tab="chronicle">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          사건 일지 <span class="nav-badge" id="badge-chronicle"></span>
+        </button>
         <div class="nav-section">작품 관리</div>
         <button class="nav-item" onclick="navigate('world')" data-tab="world">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -901,6 +909,8 @@ function navigate(tab) {
     memo: renderMemo,
     family: renderFamily,
     psyarc: renderPsyArc,
+    foreshadow: renderForeshadow,
+    chronicle: renderChronicle,
     stats: renderStats,
     items: renderItems,
   };
@@ -4029,8 +4039,28 @@ function insertSymbol(sym){
   const ta=document.getElementById('prose-editor');
   if(!ta) return;
   const s=ta.selectionStart, e=ta.selectionEnd;
-  ta.value=ta.value.slice(0,s)+sym+ta.value.slice(e);
-  ta.selectionStart=ta.selectionEnd=s+sym.length;
+  const selected=ta.value.slice(s,e);
+
+  // 쌍 기호 감지: 짝수 글자이고 앞뒤가 대응되는 경우
+  const isPair = sym.length===2;
+
+  if(isPair){
+    const open=sym[0], close=sym[1];
+    // 선택된 텍스트가 있으면 감싸기
+    const inner=selected||'';
+    ta.value=ta.value.slice(0,s)+open+inner+close+ta.value.slice(e);
+    if(inner){
+      // 선택된 텍스트 유지
+      ta.selectionStart=s+1;
+      ta.selectionEnd=s+1+inner.length;
+    } else {
+      // 커서를 가운데로
+      ta.selectionStart=ta.selectionEnd=s+1;
+    }
+  } else {
+    ta.value=ta.value.slice(0,s)+sym+ta.value.slice(e);
+    ta.selectionStart=ta.selectionEnd=s+sym.length;
+  }
   ta.focus();
   ta.dispatchEvent(new Event('input',{bubbles:true}));
 }
@@ -6298,6 +6328,271 @@ const ITEM_RARITIES = [
   {label:'전설',   color:'#c4922a'},
   {label:'신화',   color:'#e06040'},
 ];
+
+// ═══════════════════════════════════════════════════════════
+// 복선 관리
+// ═══════════════════════════════════════════════════════════
+function renderForeshadow() {
+  const p = getProject();
+  if (!p) return;
+  if (!p.foreshadows) p.foreshadows = [];
+  const list = p.foreshadows;
+  if (!window._fsFilter) window._fsFilter = '전체';
+  const filter = window._fsFilter;
+  const STATUS = ['미회수','회수완료','삭제됨'];
+  const STATUS_COLOR = {'미회수':'var(--gold)','회수완료':'var(--teal)','삭제됨':'var(--muted)'};
+  const STATUS_BG = {'미회수':'var(--gold-light)','회수완료':'var(--teal-light)','삭제됨':'var(--cream)'};
+
+  const filtered = filter === '전체' ? list : list.filter(f => f.status === filter);
+
+  document.getElementById('main').innerHTML = `
+    <div style="max-width:800px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="font-display" style="font-size:22px">복선 관리 (${list.length})</div>
+        <button class="btn btn-gold" onclick="showForeshadowModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          복선 추가
+        </button>
+      </div>
+      <!-- 필터 -->
+      <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
+        ${['전체','미회수','회수완료','삭제됨'].map(s => `
+          <button onclick="window._fsFilter='${s}';renderForeshadow()"
+            style="padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;
+              font-family:'Noto Sans KR',sans-serif;transition:all .15s;
+              border:1.5px solid ${filter===s?'var(--gold)':'var(--border)'};
+              background:${filter===s?'var(--gold)':'transparent'};
+              color:${filter===s?'#fff':'var(--muted)'}">
+            ${s} <span style="opacity:.7">(${s==='전체'?list.length:list.filter(f=>f.status===s).length})</span>
+          </button>`).join('')}
+      </div>
+      ${filtered.length === 0
+        ? `<div class="card empty-state"><div class="emoji">🎯</div><p>${filter==='전체'?'복선을 추가해보세요.':filter+' 복선이 없어요.'}</p></div>`
+        : filtered.map((f, i) => {
+          const idx = list.indexOf(f);
+          const st = f.status || '미회수';
+          return `
+          <div class="card" style="margin-bottom:12px;border-left:4px solid ${STATUS_COLOR[st]}">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+              <div style="flex:1">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+                  <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;
+                    background:${STATUS_BG[st]};color:${STATUS_COLOR[st]}">${st}</span>
+                  ${f.chars?`<span style="font-size:11px;color:var(--muted)">👤 ${esc(f.chars)}</span>`:''}
+                </div>
+                <div style="font-size:14px;font-weight:600;margin-bottom:6px;white-space:pre-wrap">${esc(f.content||'')}</div>
+                <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)">
+                  ${f.plant?`<span>🌱 뿌린 곳: <b style="color:var(--ink)">${esc(f.plant)}</b></span>`:''}
+                  ${f.harvest?`<span>✅ 회수: <b style="color:var(--ink)">${esc(f.harvest)}</b></span>`:''}
+                </div>
+              </div>
+              <div style="display:flex;gap:6px;flex-shrink:0">
+                <button onclick="showForeshadowModal(${idx})" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)" title="수정">✏️</button>
+                <button onclick="deleteForeshadow(${idx})" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--rust)" title="삭제">✕</button>
+              </div>
+            </div>
+          </div>`}).join('')}
+    </div>`;
+}
+
+function showForeshadowModal(idx) {
+  const p = getProject();
+  const f = idx !== undefined ? p.foreshadows[idx] : {};
+  const chars = p.characters || [];
+  const STATUS = ['미회수','회수완료','삭제됨'];
+  showModal(`
+    <div class="modal-title">${idx !== undefined ? '복선 수정' : '복선 추가'}</div>
+    <div class="form-grid" style="grid-template-columns:1fr">
+      <div class="full"><label class="label">복선 내용 *</label>
+        <textarea id="fs-content" rows="3" placeholder="어떤 복선인지 적어주세요">${esc(f.content||'')}</textarea></div>
+      <div><label class="label">뿌린 화/장면</label>
+        <input id="fs-plant" value="${esc(f.plant||'')}" placeholder="예: 3화, 1부 2장"></div>
+      <div><label class="label">회수 화/장면</label>
+        <input id="fs-harvest" value="${esc(f.harvest||'')}" placeholder="예: 15화"></div>
+      <div><label class="label">상태</label>
+        <select id="fs-status">${STATUS.map(s=>`<option value="${s}" ${f.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="full"><label class="label">관련 인물</label>
+        ${chars.length===0
+          ? `<input id="fs-chars" value="${esc(f.chars||'')}" placeholder="예: 영희, 철수">`
+          : `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--paper)">
+              ${chars.map(c=>{
+                const sel=(f.chars||'').split(',').map(s=>s.trim()).includes(c.name);
+                return `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;
+                  padding:3px 8px;border-radius:20px;font-size:12px;font-weight:600;
+                  border:1.5px solid ${sel?'var(--gold)':'var(--border)'};
+                  background:${sel?'var(--gold-light)':'transparent'};
+                  color:${sel?'var(--gold)':'var(--muted)'};transition:all .15s">
+                  <input type="checkbox" name="fs-chars-check" value="${esc(c.name)}" ${sel?'checked':''}
+                    style="display:none"
+                    onchange="this.parentElement.style.borderColor=this.checked?'var(--gold)':'var(--border)';
+                      this.parentElement.style.background=this.checked?'var(--gold-light)':'transparent';
+                      this.parentElement.style.color=this.checked?'var(--gold)':'var(--muted)'">
+                  ${esc(c.name)}</label>`;
+              }).join('')}
+            </div>`}
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">취소</button>
+      <button class="btn btn-gold" onclick="saveForeshadow(${idx})">저장</button>
+    </div>`);
+}
+
+function saveForeshadow(idx) {
+  const content = document.getElementById('fs-content').value.trim();
+  if (!content) { toast('복선 내용을 입력해주세요.'); return; }
+  const p = getProject();
+  if (!p.foreshadows) p.foreshadows = [];
+  const checked = [...document.querySelectorAll('input[name="fs-chars-check"]:checked')].map(el=>el.value).join(', ');
+  const chars = checked || (document.getElementById('fs-chars')?.value||'');
+  const f = {
+    id: idx !== undefined ? p.foreshadows[idx].id : uid(),
+    content, plant: document.getElementById('fs-plant').value,
+    harvest: document.getElementById('fs-harvest').value,
+    status: document.getElementById('fs-status').value, chars
+  };
+  if (idx !== undefined) p.foreshadows[idx] = f;
+  else p.foreshadows.push(f);
+  autoSave(); closeModal(); renderForeshadow();
+}
+
+function deleteForeshadow(idx) {
+  confirmDialog('이 복선을 삭제합니다.', () => {
+    const p = getProject();
+    p.foreshadows.splice(idx, 1);
+    autoSave(); renderForeshadow();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// 사건 일지
+// ═══════════════════════════════════════════════════════════
+function renderChronicle() {
+  const p = getProject();
+  if (!p) return;
+  if (!p.chronicles) p.chronicles = [];
+  const list = [...p.chronicles].sort((a,b) => (a.order||0)-(b.order||0));
+  const IMPORTANCE = ['★★★ 핵심','★★ 중요','★ 일반'];
+  const IMP_COLOR = {'★★★ 핵심':'var(--rust)','★★ 중요':'var(--gold)','★ 일반':'var(--muted)'};
+
+  document.getElementById('main').innerHTML = `
+    <div style="max-width:800px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="font-display" style="font-size:22px">사건 일지 (${list.length})</div>
+        <button class="btn btn-gold" onclick="showChronicleModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          사건 추가
+        </button>
+      </div>
+      ${list.length === 0
+        ? `<div class="card empty-state"><div class="emoji">📖</div><p>사건을 추가해보세요.</p></div>`
+        : `<div style="position:relative;padding-left:24px">
+            <div style="position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--border);border-radius:2px"></div>
+            ${list.map(ev => {
+              const idx = p.chronicles.indexOf(ev);
+              const imp = ev.importance || '★ 일반';
+              return `
+              <div style="position:relative;margin-bottom:16px">
+                <div style="position:absolute;left:-20px;top:14px;width:10px;height:10px;border-radius:50%;
+                  background:${IMP_COLOR[imp]};border:2px solid var(--paper)"></div>
+                <div class="card">
+                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+                    <div style="flex:1">
+                      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+                        <span style="font-size:13px;font-weight:700;color:var(--gold)">${esc(ev.time||'')}</span>
+                        <span style="font-size:11px;color:${IMP_COLOR[imp]};font-weight:700">${imp}</span>
+                        ${ev.place?`<span style="font-size:11px;color:var(--muted)">📍 ${esc(ev.place)}</span>`:''}
+                        ${ev.chars?`<span style="font-size:11px;color:var(--muted)">👤 ${esc(ev.chars)}</span>`:''}
+                      </div>
+                      <div style="font-size:14px;font-weight:600;margin-bottom:4px">${esc(ev.title||'')}</div>
+                      ${ev.desc?`<div style="font-size:13px;color:var(--muted);white-space:pre-wrap;line-height:1.7">${esc(ev.desc)}</div>`:''}
+                    </div>
+                    <div style="display:flex;gap:6px;flex-shrink:0">
+                      <button onclick="showChronicleModal(${idx})" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✏️</button>
+                      <button onclick="deleteChronicle(${idx})" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--rust)">✕</button>
+                    </div>
+                  </div>
+                </div>
+              </div>`}).join('')}
+          </div>`}
+    </div>`;
+}
+
+function showChronicleModal(idx) {
+  const p = getProject();
+  const ev = idx !== undefined ? p.chronicles[idx] : {};
+  const chars = p.characters || [];
+  const IMPORTANCE = ['★★★ 핵심','★★ 중요','★ 일반'];
+  showModal(`
+    <div class="modal-title">${idx !== undefined ? '사건 수정' : '사건 추가'}</div>
+    <div class="form-grid">
+      <div><label class="label">작품 내 시점 *</label>
+        <input id="cr-time" value="${esc(ev.time||'')}" placeholder="예: D+3일, 1부 3화 직후"></div>
+      <div><label class="label">정렬 순서</label>
+        <input id="cr-order" type="number" value="${ev.order||0}" placeholder="숫자가 작을수록 앞"></div>
+      <div class="full"><label class="label">사건 제목 *</label>
+        <input id="cr-title" value="${esc(ev.title||'')}" placeholder="사건을 한 줄로 요약"></div>
+      <div class="full"><label class="label">사건 내용</label>
+        <textarea id="cr-desc" rows="3" placeholder="자세한 내용">${esc(ev.desc||'')}</textarea></div>
+      <div><label class="label">장소</label>
+        <input id="cr-place" value="${esc(ev.place||'')}" placeholder="예: 왕궁, 시장"></div>
+      <div><label class="label">중요도</label>
+        <select id="cr-importance">${IMPORTANCE.map(s=>`<option value="${s}" ${ev.importance===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="full"><label class="label">관련 인물</label>
+        ${chars.length===0
+          ? `<input id="cr-chars" value="${esc(ev.chars||'')}" placeholder="예: 영희, 철수">`
+          : `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--paper)">
+              ${chars.map(c=>{
+                const sel=(ev.chars||'').split(',').map(s=>s.trim()).includes(c.name);
+                return `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;
+                  padding:3px 8px;border-radius:20px;font-size:12px;font-weight:600;
+                  border:1.5px solid ${sel?'var(--gold)':'var(--border)'};
+                  background:${sel?'var(--gold-light)':'transparent'};
+                  color:${sel?'var(--gold)':'var(--muted)'};transition:all .15s">
+                  <input type="checkbox" name="cr-chars-check" value="${esc(c.name)}" ${sel?'checked':''}
+                    style="display:none"
+                    onchange="this.parentElement.style.borderColor=this.checked?'var(--gold)':'var(--border)';
+                      this.parentElement.style.background=this.checked?'var(--gold-light)':'transparent';
+                      this.parentElement.style.color=this.checked?'var(--gold)':'var(--muted)'">
+                  ${esc(c.name)}</label>`;
+              }).join('')}
+            </div>`}
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">취소</button>
+      <button class="btn btn-gold" onclick="saveChronicle(${idx})">저장</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('cr-time')?.focus(),100);
+}
+
+function saveChronicle(idx) {
+  const time = document.getElementById('cr-time').value.trim();
+  const title = document.getElementById('cr-title').value.trim();
+  if (!time||!title) { toast('시점과 제목을 입력해주세요.'); return; }
+  const p = getProject();
+  if (!p.chronicles) p.chronicles = [];
+  const checked = [...document.querySelectorAll('input[name="cr-chars-check"]:checked')].map(el=>el.value).join(', ');
+  const chars = checked || (document.getElementById('cr-chars')?.value||'');
+  const ev = {
+    id: idx !== undefined ? p.chronicles[idx].id : uid(),
+    time, title, desc: document.getElementById('cr-desc').value,
+    place: document.getElementById('cr-place').value,
+    importance: document.getElementById('cr-importance').value,
+    order: parseInt(document.getElementById('cr-order').value)||0, chars
+  };
+  if (idx !== undefined) p.chronicles[idx] = ev;
+  else p.chronicles.push(ev);
+  autoSave(); closeModal(); renderChronicle();
+}
+
+function deleteChronicle(idx) {
+  confirmDialog('이 사건을 삭제합니다.', () => {
+    const p = getProject();
+    p.chronicles.splice(idx, 1);
+    autoSave(); renderChronicle();
+  });
+}
 
 function renderItems() {
   const p = getProject();
