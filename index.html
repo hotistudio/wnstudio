@@ -577,6 +577,8 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
   .header-btn { padding:5px 8px; font-size:11px; }
   #btn-darkmode { padding:4px 7px; font-size:14px; }
   .btn-text { display:none; }
+  #btn-save-project { padding:4px 7px; font-size:14px; }
+  #btn-load-project { padding:4px 7px; font-size:14px; }
 }
 @media(max-width:768px){
   :root{--sidebar:0px;--header:50px}
@@ -2634,16 +2636,14 @@ function chDragMove(clientY) {
   const listBody = document.getElementById('chapter-list-body');
   if (listBody) {
     const r = listBody.getBoundingClientRect();
-    const zone = 60; // 상하 감지 영역 px
+    const zone = 60;
     const speed = 8;
-    if (clientY < r.top + zone) {
-      listBody.scrollTop -= speed;
-    } else if (clientY > r.bottom - zone) {
-      listBody.scrollTop += speed;
-    }
+    if (clientY < r.top + zone) listBody.scrollTop -= speed;
+    else if (clientY > r.bottom - zone) listBody.scrollTop += speed;
   }
 
   document.querySelectorAll('.ch-drag-item').forEach(r => r.style.borderTop = '');
+  document.querySelectorAll('.ch-folder').forEach(f => f.style.outline = '');
 
   const items = [...document.querySelectorAll('.ch-drag-item')];
   const others = items.filter(el => el !== _chDrag.el);
@@ -2659,16 +2659,32 @@ function chDragMove(clientY) {
     }
   }
 
-  // 폴더 감지: 화가 없는 폴더 위에 있을 때만
+  // 폴더 헤더 위에 드래그 중이면 해당 폴더 하이라이트
+  // insertBefore가 없을 때만 폴더 전체 영역 감지
   let targetFolder = null;
   if (insertBefore === '__end__') {
     document.querySelectorAll('.ch-folder').forEach(f => {
-      const body = f.querySelector('.ch-folder-body');
-      if (!body) return;
-      const fChapters = body.querySelectorAll('.ch-drag-item');
-      if (fChapters.length === 0) {
-        const r = f.getBoundingClientRect();
-        if (clientY >= r.top && clientY <= r.bottom) targetFolder = f.dataset.folderid;
+      const r = f.getBoundingClientRect();
+      if (clientY >= r.top && clientY <= r.bottom) {
+        targetFolder = f.dataset.folderid;
+        f.style.outline = '2px solid var(--gold)';
+        f.style.outlineOffset = '-2px';
+      }
+    });
+  } else {
+    // insertBefore가 있어도 폴더 헤더 위면 폴더 이동 우선
+    document.querySelectorAll('.ch-folder').forEach(f => {
+      const header = f.querySelector('.ch-folder-header');
+      if (!header) return;
+      const r = header.getBoundingClientRect();
+      if (clientY >= r.top && clientY <= r.bottom) {
+        targetFolder = f.dataset.folderid;
+        f.style.outline = '2px solid var(--gold)';
+        f.style.outlineOffset = '-2px';
+        // 폴더 헤더 위면 insertBefore 무시
+        document.querySelectorAll('.ch-drag-item').forEach(r => r.style.borderTop = '');
+        insertBefore = '__end__';
+        _chDrag.insertBefore = '__end__';
       }
     });
   }
@@ -2686,6 +2702,7 @@ function chDragCommit() {
   ghost.remove();
   el.style.opacity = '';
   document.querySelectorAll('.ch-drag-item').forEach(r => r.style.borderTop = '');
+  document.querySelectorAll('.ch-folder').forEach(f => f.style.outline = '');
 
   const p = getProject();
   const chapters = p.chapters || [];
@@ -2693,10 +2710,13 @@ function chDragCommit() {
   if (fromIdx === -1) { renderChapters(); return; }
 
   if (targetFolder) {
-    // 빈 폴더로 드래그
-    chapters[fromIdx].folderId = targetFolder;
+    // 폴더 헤더로 드래그 → 해당 폴더의 마지막으로 이동
     const [item] = chapters.splice(fromIdx, 1);
-    chapters.push(item);
+    item.folderId = targetFolder;
+    // 해당 폴더의 마지막 위치 찾기
+    const lastFolderIdx = chapters.reduce((last, c, i) => c.folderId === targetFolder ? i : last, -1);
+    if (lastFolderIdx !== -1) chapters.splice(lastFolderIdx + 1, 0, item);
+    else chapters.push(item);
   } else if (insertBefore && insertBefore !== '__end__') {
     const toIdx = chapters.findIndex(c => c.id === insertBefore);
     if (toIdx === -1) { renderChapters(); return; }
