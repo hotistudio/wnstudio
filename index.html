@@ -2186,8 +2186,47 @@ function renderEditorContent(ch) {
               font-size:18px;color:var(--muted);cursor:pointer;line-height:1">×</button>
         </div>
         <div class="split-panel-content" id="split-content"></div>
+        <!-- 화별 메모 고정 -->
+        <div style="flex-shrink:0;border-top:1.5px solid var(--border);background:var(--cream)">
+          <div style="display:flex;align-items:center;justify-content:space-between;
+            padding:6px 14px;cursor:pointer;user-select:none"
+            onclick="toggleChapterMemo()">
+            <span style="font-size:11px;font-weight:700;color:var(--muted)">
+              📝 <span style="color:var(--gold)" id="ch-memo-title">${esc(ch.title)}</span>의 메모
+            </span>
+            <span id="ch-memo-arrow" style="font-size:10px;color:var(--muted);
+              transition:transform .2s;display:inline-block;
+              transform:rotate(${ch.memo?'0':'-90'}deg)">▾</span>
+          </div>
+          <div id="ch-memo-body" style="display:${ch.memo?'block':'none'};padding:0 10px 10px">
+            <textarea id="ch-memo-input" rows="3" placeholder="이 화에 대한 메모..."
+              oninput="updateChapterMemo('${ch.id}', this.value)"
+              style="width:100%;font-size:12px;line-height:1.8;resize:vertical;
+                background:var(--white);border:1.5px solid var(--border);border-radius:8px;
+                padding:7px 10px;font-family:'Noto Serif KR',serif;color:var(--ink)">${esc(ch.memo||'')}</textarea>
+          </div>
+        </div>
       </div>
     </div>`;
+}
+
+function toggleChapterMemo() {
+  const body = document.getElementById('ch-memo-body');
+  const arrow = document.getElementById('ch-memo-arrow');
+  if (!body) return;
+  const isHidden = body.style.display === 'none';
+  body.style.display = isHidden ? 'block' : 'none';
+  if (arrow) arrow.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
+  if (isHidden) document.getElementById('ch-memo-input')?.focus();
+}
+
+function updateChapterMemo(chId, val) {
+  const p = getProject();
+  const ch = (p.chapters||[]).find(c => c.id === chId);
+  if (!ch) return;
+  ch.memo = val;
+  clearTimeout(window._chMemoTimer);
+  window._chMemoTimer = setTimeout(autoSave, 600);
 }
 
 function onEditorInput(id, val) {
@@ -2231,6 +2270,7 @@ function selectChapter(id) {
   setTimeout(() => {
     const lb = document.getElementById('chapter-list-body');
     if (lb) lb.scrollTop = savedScroll;
+    refreshChapterMemoPanel();
   }, 0);
   // 모바일: 패널 닫고 에디터로 이동
   if (window.innerWidth <= 768) {
@@ -2241,6 +2281,23 @@ function selectChapter(id) {
       if (ea) ea.scrollIntoView({behavior:'smooth'});
     }, 100);
   }
+}
+
+function refreshChapterMemoPanel() {
+  const p = getProject();
+  const ch = (p?.chapters||[]).find(c => c.id === activeChapterId);
+  if (!ch) return;
+  const title = document.getElementById('ch-memo-title');
+  const input = document.getElementById('ch-memo-input');
+  const body  = document.getElementById('ch-memo-body');
+  const arrow = document.getElementById('ch-memo-arrow');
+  if (title) title.textContent = ch.title;
+  if (input) {
+    input.value = ch.memo || '';
+    input.oninput = () => updateChapterMemo(ch.id, input.value);
+  }
+  if (body)  body.style.display = ch.memo ? 'block' : 'none';
+  if (arrow) arrow.style.transform = ch.memo ? 'rotate(0deg)' : 'rotate(-90deg)';
 }
 
 // 폴더 기능
