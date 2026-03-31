@@ -7520,8 +7520,17 @@ function showAddMemberModal(fi) {
   const p = getProject();
   const f = p.families[fi];
   const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+  const chars = p.characters || [];
   showModal(`
     <div class="modal-title">${tab} 구성원 추가</div>
+    ${chars.length > 0 ? `
+    <div style="margin-bottom:14px;padding:10px 12px;background:var(--cream);border-radius:8px;border:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">등장인물에서 불러오기</div>
+      <select onchange="fillMemberFromChar(this)" style="width:100%;font-size:13px">
+        <option value="">— 인물 선택 —</option>
+        ${chars.map(c => `<option value="${esc(c.name)}|${esc(c.age||'')}|${esc(c.gender||'')}|${esc(c.alive||'생존')}">${esc(c.name)}${c.role?` (${esc(c.role)})`:''}</option>`).join('')}
+      </select>
+    </div>` : ''}
     <div class="form-grid">
       <div class="full"><label class="label">이름 *</label>
         <input id="mb-name" placeholder="예: 아르켄 레온하르트"></div>
@@ -7551,6 +7560,28 @@ function showAddMemberModal(fi) {
       <button class="btn btn-gold" onclick="saveFamilyMember(${fi})">추가</button>
     </div>`, false);
   setTimeout(()=>document.getElementById('mb-name')?.focus(),100);
+}
+
+function fillMemberFromChar(sel) {
+  const val = sel.value;
+  if (!val) return;
+  const [name, age, gender, alive] = val.split('|');
+  const nameEl = document.getElementById('mb-name');
+  const ageEl  = document.getElementById('mb-age');
+  const genEl  = document.getElementById('mb-gender');
+  const alvEl  = document.getElementById('mb-alive');
+  if (nameEl) nameEl.value = name;
+  if (ageEl)  ageEl.value  = age;
+  if (genEl) {
+    const map = {'남':'남','남성':'남','여':'여','여성':'여','기타':'기타'};
+    genEl.value = map[gender] || '';
+  }
+  if (alvEl) {
+    const map = {'생존':'생존','사망':'사망','불명':'불명','불사':'불사','불사/불멸':'불사'};
+    alvEl.value = map[alive] || '생존';
+  }
+  sel.value = ''; // 선택 초기화
+  document.getElementById('mb-relation')?.focus();
 }
 
 function showEditMemberModal(fi, mi) {
