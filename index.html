@@ -84,6 +84,14 @@
   --rust:#e06040; --rust-light:#2a1510;
   --muted:#9a8e7f; --border:#3a342c; --shadow:rgba(0,0,0,.3);
 }
+/* 다크모드 + 컬러 테마 조합 */
+[data-theme="dark"][data-color-theme="red"]   { --gold:#e87070; --gold2:#f09090; --gold-light:#3a1010; --teal:#c05050; --teal2:#d07070; --border:#5a2a2a; }
+[data-theme="dark"][data-color-theme="orange"] { --gold:#e8904a; --gold2:#f0b070; --gold-light:#3a2010; --teal:#c07030; --teal2:#d09050; --border:#5a3a20; }
+[data-theme="dark"][data-color-theme="yellow"] { --gold:#e8bc5c; --gold2:#f5d080; --gold-light:#2a2310; --teal:#3d9195; --teal2:#4aabb0; --border:#3a342c; }
+[data-theme="dark"][data-color-theme="green"]  { --gold:#4aaa5a; --gold2:#70cc80; --gold-light:#0a2010; --teal:#2a8a45; --teal2:#3aaa60; --border:#2a4a30; }
+[data-theme="dark"][data-color-theme="blue"]   { --gold:#5080e8; --gold2:#70a0f0; --gold-light:#0a1030; --teal:#3060c0; --teal2:#4080d8; --border:#2a3a5a; }
+[data-theme="dark"][data-color-theme="navy"]   { --gold:#7070d0; --gold2:#9090e0; --gold-light:#0a0a28; --teal:#5050a8; --teal2:#6060c0; --border:#2a2a4a; }
+[data-theme="dark"][data-color-theme="purple"] { --gold:#a060e0; --gold2:#c080f0; --gold-light:#1a0830; --teal:#8040b8; --teal2:#9850d0; --border:#3a2050; }
 [data-theme="dark"] #prose-editor { color:var(--ink) !important; }
 [data-theme="dark"] .editor-content { background:var(--paper) !important; }
 [data-theme="dark"] .editor-toolbar { background:var(--white) !important; }
@@ -4664,20 +4672,24 @@ function renderSplitContent() {
       </div>
       ${chars.map((c,i) => {
         const bg = c.color || (c.group ? getGroupColor(c.group) : 'var(--white)');
+        const isDark = document.documentElement.dataset.theme === 'dark';
+        const hasCustomBg = !!(c.color || c.group);
+        // 다크모드에서 밝은 배경 카드는 어두운 텍스트, 배경 없으면 var(--ink)
+        const cardText = hasCustomBg ? '#18120a' : 'var(--ink)';
         const collapsed = splitCharCollapsed['c'+i] !== false ? true : false; // 기본 접힘
         return `
-        <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;background:${bg}">
+        <div style="border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;background:${bg};color:${cardText}">
           <div style="padding:8px 12px;background:rgba(0,0,0,.04);display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer"
             onclick="toggleSplitChar(${i})">
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:2px">
-                <span style="font-weight:700;font-size:14px">${esc(c.name)}</span>
+                <span style="font-weight:700;font-size:14px;color:${cardText}">${esc(c.name)}</span>
                 ${c.role?`<span style="font-size:10px;background:var(--gold-light);color:var(--gold);padding:1px 7px;border-radius:20px;font-weight:600">${esc(c.role)}</span>`:''}
-                ${c.gender?`<span style="font-size:10px;background:var(--cream);color:var(--muted);padding:1px 7px;border-radius:20px;font-weight:600">${esc(c.gender)}</span>`:''}
-                ${c.age?`<span style="font-size:10px;background:var(--cream);color:var(--muted);padding:1px 7px;border-radius:20px;font-weight:600">${esc(c.age)}세</span>`:''}
-                ${c.alive&&c.alive!=='생존'?`<span style="font-size:10px;background:${c.alive==='사망'?'var(--rust-light)':'var(--cream)'};color:${c.alive==='사망'?'var(--rust)':'var(--muted)'};padding:1px 7px;border-radius:20px;font-weight:600">${esc(c.alive)}</span>`:''}
+                ${c.gender?`<span style="font-size:10px;background:rgba(0,0,0,.08);color:${cardText};padding:1px 7px;border-radius:20px;font-weight:600">${esc(c.gender)}</span>`:''}
+                ${c.age?`<span style="font-size:10px;background:rgba(0,0,0,.08);color:${cardText};padding:1px 7px;border-radius:20px;font-weight:600">${esc(c.age)}세</span>`:''}
+                ${c.alive&&c.alive!=='생존'?`<span style="font-size:10px;background:${c.alive==='사망'?'var(--rust-light)':'rgba(0,0,0,.08)'};color:${c.alive==='사망'?'var(--rust)':cardText};padding:1px 7px;border-radius:20px;font-weight:600">${esc(c.alive)}</span>`:''}
               </div>
-              ${c.group?`<div style="font-size:10px;color:var(--muted)">${esc(c.group)}</div>`:''}
+              ${c.group?`<div style="font-size:10px;color:${cardText};opacity:.7">${esc(c.group)}</div>`:''}
             </div>
             <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;margin-left:6px">
               <button onclick="event.stopPropagation();showCharModal(${i})"
@@ -4688,10 +4700,10 @@ function renderSplitContent() {
           ${collapsed ? '' : `
           <div style="padding:10px 12px;font-size:12px;line-height:1.8;border-top:1px solid rgba(0,0,0,.06)">
             ${c.honorific?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${c.honorific.split(',').map(h=>h.trim()).filter(Boolean).map(h=>`<span style="font-size:10px;background:var(--teal-light);color:var(--teal);padding:1px 7px;border-radius:20px;font-weight:600">${esc(h)}</span>`).join('')}</div>`:''}
-            ${c.appearance?`<div style="margin-bottom:3px"><span style="color:var(--muted)">외모 </span>${esc(c.appearance)}</div>`:''}
-            ${c.personality?`<div style="margin-bottom:3px"><span style="color:var(--muted)">성격 </span>${esc(c.personality)}</div>`:''}
-            ${c.background?`<div style="margin-bottom:3px"><span style="color:var(--muted)">배경 </span>${esc(c.background)}</div>`:''}
-            ${c.speech?`<div style="margin-bottom:3px"><span style="color:var(--muted)">특징/능력 </span>${esc(c.speech)}</div>`:''}
+            ${c.appearance?`<div style="margin-bottom:3px"><span style="color:${cardText};opacity:.6">외모 </span>${esc(c.appearance)}</div>`:''}
+            ${c.personality?`<div style="margin-bottom:3px"><span style="color:${cardText};opacity:.6">성격 </span>${esc(c.personality)}</div>`:''}
+            ${c.background?`<div style="margin-bottom:3px"><span style="color:${cardText};opacity:.6">배경 </span>${esc(c.background)}</div>`:''}
+            ${c.speech?`<div style="margin-bottom:3px"><span style="color:${cardText};opacity:.6">특징/능력 </span>${esc(c.speech)}</div>`:''}
             ${c.goal?`<div><span style="color:var(--rust);font-weight:600">목표 </span>${esc(c.goal)}</div>`:''}
           </div>`}
         </div>`;
