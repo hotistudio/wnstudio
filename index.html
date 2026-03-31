@@ -5864,15 +5864,35 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // Ctrl+1~0 → 특수기호 삽입 (집필 편집기에서만)
+  // Ctrl+1~0 → 특수기호 삽입 (집필 편집기 + 집중 모드)
   if ((e.ctrlKey || e.metaKey) && SHORTCUT_SYMBOLS[e.key]) {
     const ta = document.getElementById('prose-editor');
-    if (!ta || document.activeElement !== ta) return;
+    const fe = document.getElementById('focus-editor');
+    const active = document.activeElement;
+    if (active !== ta && active !== fe) return;
     e.preventDefault();
-    insertSymbol(SHORTCUT_SYMBOLS[e.key]);
+    const sym = SHORTCUT_SYMBOLS[e.key];
+    if (active === fe) {
+      // 집중 모드 에디터
+      const s = fe.selectionStart, en = fe.selectionEnd;
+      const selected = fe.value.slice(s, en);
+      const isPair = sym.length === 2;
+      if (isPair) {
+        const inner = selected || '';
+        fe.value = fe.value.slice(0,s) + sym[0] + inner + sym[1] + fe.value.slice(en);
+        if (inner) { fe.selectionStart = s+1; fe.selectionEnd = s+1+inner.length; }
+        else fe.selectionStart = fe.selectionEnd = s+1;
+      } else {
+        fe.value = fe.value.slice(0,s) + sym + fe.value.slice(en);
+        fe.selectionStart = fe.selectionEnd = s + sym.length;
+      }
+      fe.dispatchEvent(new Event('input', {bubbles:true}));
+    } else {
+      insertSymbol(sym);
+    }
     const ind = document.getElementById('shortcut-indicator');
     if (ind) {
-      ind.textContent = SHORTCUT_SYMBOLS[e.key];
+      ind.textContent = sym;
       ind.style.opacity = '1';
       clearTimeout(ind._t);
       ind._t = setTimeout(() => { ind.style.opacity = '0'; }, 800);
