@@ -248,7 +248,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 
 /* ═══ MODAL ══════════════════════════════════════════════════ */
 .modal-bg{position:fixed;inset:0;background:rgba(24,18,10,.55);
-  backdrop-filter:blur(4px);z-index:500;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);z-index:1500;display:flex;align-items:center;justify-content:center;
   animation:fadein .2s;padding:16px}
 .modal{background:var(--paper);border:1px solid var(--border);border-radius:14px;
   padding:24px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;
@@ -630,6 +630,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
       <button class="header-btn" id="fs-status-btn" onclick="fsConnect()" title="로컬 파일에 자동저장" style="font-size:16px;padding:5px 8px">💾 파일 연결</button>
       <button class="header-btn" onclick="showExportModal()" id="btn-export" style="display:none">📤 <span class="btn-text">전체 내보내기</span></button>
       <button class="header-btn" onclick="document.getElementById('import-file').click()" id="btn-import" style="display:none">📂 <span class="btn-text">전체 불러오기</span></button>
+      <button class="header-btn gold" onclick="exportCurrentProject()" id="btn-save-project" style="display:none">💾 <span class="btn-text">작품 저장</span></button>
     </div>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
     <input type="file" id="import-single-file" accept=".json" style="display:none" onchange="importSingleProject(event)">
@@ -808,6 +809,17 @@ function exportData() {
   toast('저장 파일을 다운로드했습니다 📁');
 }
 
+function exportCurrentProject() {
+  const p = getProject();
+  if (!p) { toast('저장할 작품이 없어요.'); return; }
+  const blob = new Blob([JSON.stringify(p, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  toast(`"${p.title||'작품'}" 저장 완료 💾`);
+}
+
 function exportSingleProject(pid) {
   const p = state.projects.find(p => p.id === pid);
   if (!p) return;
@@ -905,6 +917,7 @@ function goHome() {
   document.getElementById('header-project').textContent = '';
   document.getElementById('btn-export').style.display = 'none';
   document.getElementById('btn-import').style.display = 'none';
+  document.getElementById('btn-save-project').style.display = 'none';
   document.getElementById('main').classList.remove('no-pad');
   closeSidebar();
   history.replaceState({screen:'home'}, '');
@@ -921,6 +934,7 @@ function openProject(id) {
   document.getElementById('header-project').textContent = p.title || '제목 없음';
   document.getElementById('btn-export').style.display = 'inline-flex';
   document.getElementById('btn-import').style.display = 'inline-flex';
+  document.getElementById('btn-save-project').style.display = 'inline-flex';
   document.getElementById('sidebar-project-title').textContent = p.title || '제목 없음';
   document.getElementById('sidebar-project-status').innerHTML = statusBadge(p.status);
   navigate('overview');
@@ -4929,13 +4943,13 @@ function renderSplitContent() {
       el.innerHTML = `<div style="text-align:center;padding:30px 0">
         <div style="font-size:32px;margin-bottom:8px">🏰</div>
         <div style="color:var(--muted);font-size:13px;margin-bottom:12px">등록된 가문 및 집단이 없어요</div>
-        <button class="btn btn-gold btn-sm" onclick="navigate('family')">＋ 추가</button>
+        <button class="btn btn-gold btn-sm" onclick="showFamilyModal()">＋ 추가</button>
       </div>`;
       return;
     }
     el.innerHTML = `
       <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-        <button class="btn btn-gold btn-sm" onclick="navigate('family')">＋ 추가</button>
+        <button class="btn btn-gold btn-sm" onclick="showFamilyModal()">＋ 추가</button>
       </div>
       ${families.map((f, fi) => {
         const collapsed = splitFamilyCollapsed['f'+fi];
@@ -4982,7 +4996,7 @@ function renderSplitContent() {
     const catGroups = usedCats.map(c => ({ cat: c, list: items.filter(it => it.cat === c) }));
     el.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
       + '<span style="font-size:12px;font-weight:700;color:var(--muted)">아이템 (' + items.length + ')</span>'
-      + '<button onclick="navigate(\'items\')" class="btn btn-outline btn-sm">전체 보기</button></div>'
+      + '</div>'
       + (items.length === 0
         ? '<div style="color:var(--muted);text-align:center;padding:30px 0;font-size:13px">아이템이 없어요</div>'
         : catGroups.map(({cat, list}) => {
@@ -5118,13 +5132,13 @@ function addChapterMemo() {
   if (!p.memos) p.memos = [];
   p.memos.unshift({ id: uid(), title: '', content: '', color: '#fff8e1', updatedAt: new Date().toISOString() });
   autoSave();
-  renderSplitContent();
+  refreshSplitPanel();
 }
 
 function deleteChapterMemo(idx) {
   getChapterMemos().splice(idx, 1);
   autoSave();
-  renderSplitContent();
+  refreshSplitPanel();
 }
 
 function updateChapterMemoText(idx, val) {
@@ -5178,19 +5192,27 @@ function focusRefTab(tab) {
   document.querySelectorAll('#focus-ref-panel .split-tab').forEach(b => {
     b.classList.toggle('active', !!label && b.textContent.trim().includes(label));
   });
-  // 기존 renderSplitContent 로직 재활용
+
+  const el = document.getElementById('focus-ref-content');
+  if (!el) return;
+
   const prevTab = splitTab;
   splitTab = tab;
-  const el = document.getElementById('focus-ref-content');
-  if (el) {
-    const prevEl = document.getElementById('split-content');
-    if (prevEl) prevEl.id = 'split-content-bak';
-    el.id = 'split-content';
+
+  // split-content가 있으면 임시로 id 변경, 없으면 그냥 진행
+  const prevEl = document.getElementById('split-content');
+  if (prevEl) prevEl.id = '__split_bak__';
+  el.id = 'split-content';
+
+  try {
     renderSplitContent();
+  } catch(err) {
+    console.warn('focusRefTab render error:', err);
+  } finally {
     el.id = 'focus-ref-content';
     if (prevEl) prevEl.id = 'split-content';
+    splitTab = prevTab;
   }
-  splitTab = prevTab;
 }
 
 function enterFocusMode() {
@@ -7467,7 +7489,9 @@ function saveFamily(idx) {
     groups: idx!==undefined ? p.families[idx].groups||{} : {},
   };
   if (idx!==undefined) p.families[idx]=f; else p.families.push(f);
-  autoSave(); closeModal(); renderFamily();
+  autoSave(); closeModal();
+  refreshSplitPanel();
+  if (!document.getElementById('focus-overlay')?.classList.contains('active')) renderFamily();
   toast(idx!==undefined?'수정했습니다.':'가문을 추가했습니다!');
 }
 
