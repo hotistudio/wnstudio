@@ -6901,10 +6901,12 @@ function renderItems() {
   const chars = p.characters || [];
 
   // 필터 상태
-  if (!window._itemFilter) window._itemFilter = '전체';
+  if (!window._itemFilter)     window._itemFilter = '전체';
   if (!window._itemCharFilter) window._itemCharFilter = '전체';
-  const filter = window._itemFilter;
+  if (window._itemSearch === undefined) window._itemSearch = '';
+  const filter     = window._itemFilter;
   const charFilter = window._itemCharFilter;
+  const sq         = (window._itemSearch || '').trim().toLowerCase();
 
   // 카테고리 필터링
   const parentGroup = ITEM_GROUPS.find(g => g.group === filter);
@@ -6916,9 +6918,16 @@ function renderItems() {
   const charFiltered = charFilter === '전체' ? baseFiltered
     : baseFiltered.filter(it => it.chars && it.chars.includes(charFilter));
 
+  // 검색 필터링
+  const searchFiltered = sq
+    ? charFiltered.filter(it =>
+        (it.name||'').toLowerCase().includes(sq) ||
+        (it.desc||'').toLowerCase().includes(sq))
+    : charFiltered;
+
   // 희귀도 순 정렬
   const rarityOrder = ITEM_RARITIES.map(r => r.label).reverse();
-  const filtered = [...charFiltered].sort((a, b) => {
+  const filtered = [...searchFiltered].sort((a, b) => {
     const ai = rarityOrder.indexOf(a.rarity || '일반');
     const bi = rarityOrder.indexOf(b.rarity || '일반');
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
@@ -6934,7 +6943,7 @@ function renderItems() {
   const groupCount = g => items.filter(it => g.cats.includes(it.cat)).length;
   const catCount   = c => items.filter(it => it.cat === c).length;
 
-  // 필터 UI — 대분류 행 + 소분류 행
+  // 필터 UI
   const activeGroup = parentGroup || ITEM_GROUPS.find(g => g.cats.includes(filter));
   const filterHtml = `
     <div style="display:flex;gap:5px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:6px;
@@ -6975,26 +6984,29 @@ function renderItems() {
           ${c} <span style="opacity:.7">(${catCount(c)})</span>
         </button>`).join('')}
     </div>` : '<div style="margin-bottom:4px"></div>'}
-    ${usedChars.length > 0 ? `
-    <div style="display:flex;align-items:center;gap:5px;flex-wrap:nowrap;overflow-x:auto;
-      margin-bottom:14px;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none">
-      <span style="font-size:11px;color:var(--muted);flex-shrink:0;font-weight:600">👤</span>
-      <button onclick="window._itemCharFilter='전체';renderItems()"
-        style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;
-          white-space:nowrap;flex-shrink:0;cursor:pointer;
-          font-family:'Noto Sans KR',sans-serif;transition:all .15s;
-          border:1.5px solid ${charFilter==='전체'?'var(--gold)':'var(--border)'};
-          background:${charFilter==='전체'?'var(--gold)':'transparent'};
-          color:${charFilter==='전체'?'#fff':'var(--muted)'}">전체</button>
-      ${usedChars.map(ch => `
-        <button onclick="window._itemCharFilter='${esc(ch)}';renderItems()"
-          style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;
-            white-space:nowrap;flex-shrink:0;cursor:pointer;
-            font-family:'Noto Sans KR',sans-serif;transition:all .15s;
-            border:1.5px solid ${charFilter===ch?'var(--gold)':'var(--border)'};
-            background:${charFilter===ch?'var(--gold)':'transparent'};
-            color:${charFilter===ch?'#fff':'var(--muted)'}">${esc(ch)}</button>`).join('')}
-    </div>` : '<div style="margin-bottom:14px"></div>'}`;
+    <!-- 검색 + 인물 드롭다운 -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="position:relative;flex:1;min-width:160px">
+        <input id="item-search-input" value="${esc(window._itemSearch||'')}"
+          oninput="window._itemSearch=this.value;renderItems()"
+          placeholder="아이템 검색..."
+          style="width:100%;padding:7px 30px 7px 12px;border:1.5px solid var(--border);
+            border-radius:8px;font-size:12px;background:var(--paper);color:var(--ink);
+            font-family:'Noto Sans KR',sans-serif;outline:none"
+          onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--border)'">
+        ${sq?`<button onclick="window._itemSearch='';renderItems()"
+          style="position:absolute;right:8px;top:50%;transform:translateY(-50%);
+            background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">×</button>`:''}
+      </div>
+      ${usedChars.length > 0 ? `
+      <select onchange="window._itemCharFilter=this.value;renderItems()"
+        style="padding:7px 10px;border:1.5px solid ${charFilter!=='전체'?'var(--gold)':'var(--border)'};
+          border-radius:8px;font-size:12px;background:var(--paper);color:var(--ink);
+          font-family:'Noto Sans KR',sans-serif;cursor:pointer;font-weight:${charFilter!=='전체'?'700':'400'}">
+        <option value="전체" ${charFilter==='전체'?'selected':''}>👤 전체 인물</option>
+        ${usedChars.map(ch=>`<option value="${esc(ch)}" ${charFilter===ch?'selected':''}>${esc(ch)}</option>`).join('')}
+      </select>` : ''}
+    </div>`;
 
   document.getElementById('main').innerHTML = `
     <div style="max-width:860px;margin:0 auto">
@@ -7065,24 +7077,16 @@ function showItemModal(idx) {
       <div class="full"><label class="label">관련 인물</label>
         ${chars.length === 0
           ? `<input id="it-chars" value="${esc(it.chars||'')}" placeholder="예: 영희, 철수">`
-          : `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;
-              border:1.5px solid var(--border);border-radius:8px;background:var(--paper)">
+          : `<select id="it-chars-select" multiple
+              style="width:100%;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;
+                background:var(--paper);color:var(--ink);font-family:'Noto Sans KR',sans-serif;
+                font-size:13px;min-height:80px">
               ${chars.map(c => {
                 const selected = (it.chars||'').split(',').map(s=>s.trim()).includes(c.name);
-                return `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;
-                  padding:3px 8px;border-radius:20px;font-size:12px;font-weight:600;
-                  border:1.5px solid ${selected?'var(--gold)':'var(--border)'};
-                  background:${selected?'var(--gold-light)':'transparent'};
-                  color:${selected?'var(--gold)':'var(--muted)'};transition:all .15s">
-                  <input type="checkbox" name="it-chars-check" value="${esc(c.name)}"
-                    ${selected?'checked':''} style="display:none"
-                    onchange="this.parentElement.style.borderColor=this.checked?'var(--gold)':'var(--border)';
-                      this.parentElement.style.background=this.checked?'var(--gold-light)':'transparent';
-                      this.parentElement.style.color=this.checked?'var(--gold)':'var(--muted)'">
-                  ${esc(c.name)}
-                </label>`;
+                return `<option value="${esc(c.name)}" ${selected?'selected':''}>${esc(c.name)}${c.role?` (${esc(c.role)})`:''}</option>`;
               }).join('')}
-            </div>`}
+            </select>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">Ctrl(또는 Cmd)을 누른 채 클릭하면 여러 명 선택할 수 있어요</div>`}
       </div>
       <div><label class="label">등장 챕터/장면</label>
         <input id="it-chapter" value="${esc(it.chapter||'')}" placeholder="예: 3화, 1부 2장"></div>
@@ -7099,9 +7103,10 @@ function saveItem(idx) {
   if (!name) { toast('아이템명을 입력해주세요.'); return; }
   const p = getProject();
   if (!p.items) p.items = [];
-  const checkedChars = [...document.querySelectorAll('input[name="it-chars-check"]:checked')]
-    .map(el => el.value).join(', ');
-  const charsVal = checkedChars || (document.getElementById('it-chars')?.value || '');
+  const sel = document.getElementById('it-chars-select');
+  const charsVal = sel
+    ? [...sel.selectedOptions].map(o=>o.value).join(', ')
+    : (document.getElementById('it-chars')?.value || '');
   const it = {
     id: idx !== undefined ? p.items[idx].id : uid(),
     name,
