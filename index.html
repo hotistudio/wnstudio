@@ -628,8 +628,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
       <button class="header-btn" onclick="toggleDarkMode()" id="btn-darkmode" title="다크모드 전환" style="font-size:16px;padding:5px 8px">🌙</button>
       <button class="header-btn" onclick="toggleThemePicker()" id="btn-theme" title="테마 색상" style="font-size:16px;padding:5px 8px">🎨</button>
       <button class="header-btn" id="fs-status-btn" onclick="fsConnect()" title="로컬 파일에 자동저장" style="font-size:16px;padding:5px 8px">💾 파일 연결</button>
-      <button class="header-btn" onclick="showExportModal()" id="btn-export" style="display:none">📤 <span class="btn-text">전체 내보내기</span></button>
-      <button class="header-btn" onclick="document.getElementById('import-file').click()" id="btn-import" style="display:none">📂 <span class="btn-text">전체 불러오기</span></button>
+      <button class="header-btn" onclick="document.getElementById('import-single-file').click()" id="btn-load-project" style="display:none">📂 <span class="btn-text">작품 불러오기</span></button>
       <button class="header-btn gold" onclick="exportCurrentProject()" id="btn-save-project" style="display:none">💾 <span class="btn-text">작품 저장</span></button>
     </div>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
@@ -915,9 +914,8 @@ function goHome() {
   document.getElementById('menu-toggle').style.display = 'none';
   document.getElementById('header-sep').style.display = 'none';
   document.getElementById('header-project').textContent = '';
-  document.getElementById('btn-export').style.display = 'none';
-  document.getElementById('btn-import').style.display = 'none';
   document.getElementById('btn-save-project').style.display = 'none';
+  document.getElementById('btn-load-project').style.display = 'none';
   document.getElementById('main').classList.remove('no-pad');
   closeSidebar();
   history.replaceState({screen:'home'}, '');
@@ -932,9 +930,8 @@ function openProject(id) {
   document.getElementById('menu-toggle').style.display = 'inline-flex';
   document.getElementById('header-sep').style.display = 'inline';
   document.getElementById('header-project').textContent = p.title || '제목 없음';
-  document.getElementById('btn-export').style.display = 'inline-flex';
-  document.getElementById('btn-import').style.display = 'inline-flex';
   document.getElementById('btn-save-project').style.display = 'inline-flex';
+  document.getElementById('btn-load-project').style.display = 'inline-flex';
   document.getElementById('sidebar-project-title').textContent = p.title || '제목 없음';
   document.getElementById('sidebar-project-status').innerHTML = statusBadge(p.status);
   navigate('overview');
