@@ -3985,25 +3985,65 @@ function getMemos() {
 
 function saveMemos() { autoSave(); }
 
+function renderMemoList() {
+  const memos = getMemos();
+  const q = (window._memoSearch || '').trim().toLowerCase();
+  const clearBtn = document.getElementById('memo-search-clear');
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
+  const grid = document.getElementById('memo-grid-wrap');
+  if (!grid) return;
+  if (memos.length === 0) {
+    grid.innerHTML = '<div class="card empty-state"><div class="emoji">📝</div><p>메모를 추가해보세요.<br>아이디어, 설정, 대사 등 뭐든 자유롭게!</p></div>';
+    return;
+  }
+  const shown = memos.map((m,i) => ({m,i})).filter(({m}) =>
+    !q ||
+    (m.title||'').toLowerCase().includes(q) ||
+    (m.content||'').toLowerCase().includes(q)
+  );
+  if (shown.length === 0) {
+    grid.innerHTML = '<div class="card empty-state"><div class="emoji">🔍</div><p>검색 결과가 없어요.</p></div>';
+  } else {
+    grid.innerHTML = '<div class="memo-grid">' + shown.map(({m,i}) => renderMemoCard(m, i, q)).join('') + '</div>';
+  }
+}
+
 function renderMemo() {
   const memos = getMemos();
   document.getElementById('main').innerHTML = `
     <div style="max-width:1000px;margin:0 auto">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div class="font-display" style="font-size:22px">메모장 (${memos.length})</div>
         <button class="btn btn-gold" onclick="addMemo()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           메모 추가
         </button>
       </div>
-      ${memos.length === 0
-        ? `<div class="card empty-state"><div class="emoji">📝</div><p>메모를 추가해보세요.<br>아이디어, 설정, 대사 등 뭐든 자유롭게!</p></div>`
-        : `<div class="memo-grid">${memos.map((m,i) => renderMemoCard(m,i)).join('')}</div>`}
+      <div style="position:relative;margin-bottom:16px">
+        <input id="memo-search-input"
+          oninput="window._memoSearch=this.value;renderMemoList()"
+          placeholder="메모 검색..."
+          style="width:100%;padding:9px 36px 9px 14px;border:1.5px solid var(--border);
+            border-radius:10px;font-size:13px;background:var(--paper);color:var(--ink);
+            font-family:'Noto Sans KR',sans-serif;outline:none;transition:border-color .15s"
+          onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--border)'">
+        <button id="memo-search-clear"
+          onclick="window._memoSearch='';document.getElementById('memo-search-input').value='';renderMemoList()"
+          style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+            display:none;background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">×</button>
+      </div>
+      <div id="memo-grid-wrap"></div>
     </div>`;
+  renderMemoList();
 }
 
-function renderMemoCard(m, i) {
+function renderMemoCard(m, i, q='') {
   const col = MEMO_COLORS.find(c=>c.bg===m.color) || MEMO_COLORS[0];
+  // 검색어 하이라이트 (textarea는 HTML 렌더 안 되므로 미리보기용)
+  const highlightedContent = q && m.content
+    ? esc(m.content).replace(new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),
+        s=>`<mark style="background:#ffe066;color:#18120a;border-radius:2px">${s}</mark>`)
+    : null;
   return `
     <div class="memo-card" style="background:${col.bg};border-color:${col.border}">
       <div class="memo-card-header" style="border-color:${col.border};background:${col.bg}">
@@ -4018,10 +4058,13 @@ function renderMemoCard(m, i) {
           </button>
         </div>
       </div>
-      <textarea class="memo-card-body" rows="6"
-        oninput="updateMemo(${i},'content',this.value)"
-        placeholder="자유롭게 메모하세요..."
-        style="color:#1a1208 !important;background:transparent !important">${esc(m.content||'')}</textarea>
+      ${q && highlightedContent
+        ? `<div class="memo-card-body" style="color:#1a1208 !important;background:transparent !important;
+            padding:10px 14px;font-size:13px;line-height:1.7;white-space:pre-wrap;min-height:80px">${highlightedContent}</div>`
+        : `<textarea class="memo-card-body" rows="6"
+            oninput="updateMemo(${i},'content',this.value)"
+            placeholder="자유롭게 메모하세요..."
+            style="color:#1a1208 !important;background:transparent !important">${esc(m.content||'')}</textarea>`}
       <div style="padding:6px 14px 10px;font-size:10px;color:rgba(0,0,0,.4) !important">
         ${m.updatedAt ? new Date(m.updatedAt).toLocaleDateString('ko-KR') : ''}
       </div>
