@@ -628,10 +628,11 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
       <button class="header-btn" onclick="toggleDarkMode()" id="btn-darkmode" title="다크모드 전환" style="font-size:16px;padding:5px 8px">🌙</button>
       <button class="header-btn" onclick="toggleThemePicker()" id="btn-theme" title="테마 색상" style="font-size:16px;padding:5px 8px">🎨</button>
       <button class="header-btn" id="fs-status-btn" onclick="fsConnect()" title="로컬 파일에 자동저장" style="font-size:16px;padding:5px 8px">💾 파일 연결</button>
-      <button class="header-btn" onclick="showExportModal()" id="btn-export" style="display:none">📤 <span class="btn-text">내보내기</span></button>
-      <button class="header-btn" onclick="document.getElementById('import-file').click()" id="btn-import" style="display:none">📂 <span class="btn-text">불러오기</span></button>
+      <button class="header-btn" onclick="showExportModal()" id="btn-export" style="display:none">📤 <span class="btn-text">전체 내보내기</span></button>
+      <button class="header-btn" onclick="document.getElementById('import-file').click()" id="btn-import" style="display:none">📂 <span class="btn-text">전체 불러오기</span></button>
     </div>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+    <input type="file" id="import-single-file" accept=".json" style="display:none" onchange="importSingleProject(event)">
   </header>
 
   <!-- SIDEBAR OVERLAY (mobile) -->
@@ -805,6 +806,48 @@ function exportData() {
   a.download = (p.title || '웹소설') + '_' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
   toast('저장 파일을 다운로드했습니다 📁');
+}
+
+function exportSingleProject(pid) {
+  const p = state.projects.find(p => p.id === pid);
+  if (!p) return;
+  const blob = new Blob([JSON.stringify(p, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  toast(`"${p.title||'작품'}" 저장 완료 📁`);
+}
+
+function importSingleProject(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      // 단일 작품 형식인지 확인
+      if (!data.id && !data.title && !data.chapters) {
+        toast('올바른 작품 파일이 아니에요.'); return;
+      }
+      const proj = { ...data, id: data.id || uid() };
+      // 같은 id가 있으면 덮어쓰기, 없으면 추가
+      const idx = state.projects.findIndex(p => p.id === proj.id);
+      if (idx !== -1) {
+        confirmDialog(`"${proj.title||'작품'}"이 이미 있어요. 덮어쓸까요?`, () => {
+          state.projects[idx] = proj;
+          saveToStorage(); renderHome();
+          toast(`"${proj.title||'작품'}" 불러오기 완료 📖`);
+        });
+      } else {
+        state.projects.push(proj);
+        saveToStorage(); renderHome();
+        toast(`"${proj.title||'작품'}" 불러오기 완료 📖`);
+      }
+    } catch { toast('파일을 읽을 수 없어요.'); }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
 }
 
 function importData(e) {
@@ -1052,10 +1095,15 @@ function renderHome() {
           <div class="project-card-synopsis">${esc(p.synopsis||'줄거리가 없습니다.')}</div>
           <div class="project-card-footer">
             <span class="project-card-meta">${(p.chapters||[]).length}화 · ${wordCount.toLocaleString()}자</span>
-            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteProjectByIndex(${_pi})">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              삭제
-            </button>
+            <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
+              <button class="btn btn-outline btn-sm" onclick="exportSingleProject('${p.id}')" title="이 작품만 저장">
+                📤 저장
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="deleteProjectByIndex(${_pi})">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                삭제
+              </button>
+            </div>
           </div>
         </div>
       </div>`;
@@ -1077,7 +1125,10 @@ function renderHome() {
         </div>
         <div style="display:flex;gap:10px">
           <button class="btn btn-outline btn-sm" onclick="document.getElementById('import-file').click()">
-            📂 파일 불러오기
+            📂 전체 불러오기
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('import-single-file').click()">
+            📥 작품 불러오기
           </button>
           <button class="btn btn-gold" onclick="showNewProjectModal()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
