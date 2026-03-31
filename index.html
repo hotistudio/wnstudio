@@ -6988,13 +6988,13 @@ function renderItems() {
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
       <div style="position:relative;flex:1;min-width:160px">
         <input id="item-search-input" value="${esc(window._itemSearch||'')}"
-          oninput="window._itemSearch=this.value;renderItems()"
+          oninput="window._itemSearch=this.value;renderItemGrid()"
           placeholder="아이템 검색..."
           style="width:100%;padding:7px 30px 7px 12px;border:1.5px solid var(--border);
             border-radius:8px;font-size:12px;background:var(--paper);color:var(--ink);
             font-family:'Noto Sans KR',sans-serif;outline:none"
           onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--border)'">
-        ${sq?`<button onclick="window._itemSearch='';renderItems()"
+        ${sq?`<button onclick="window._itemSearch='';document.getElementById('item-search-input').value='';renderItemGrid()"
           style="position:absolute;right:8px;top:50%;transform:translateY(-50%);
             background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">×</button>`:''}
       </div>
@@ -7019,42 +7019,78 @@ function renderItems() {
       </div>
       ${filterHtml}
       <!-- 아이템 그리드 -->
-      ${filtered.length === 0
-        ? `<div class="card empty-state"><div class="emoji">📦</div><p>아이템을 추가해보세요.</p></div>`
-        : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
-            ${filtered.map(it => {
-              const idx = items.indexOf(it);
-              const rarity = ITEM_RARITIES.find(r=>r.label===it.rarity) || ITEM_RARITIES[0];
-              return `
-              <div class="card card-sm" style="padding:0;overflow:hidden;border-top:3px solid ${rarity.color}">
-                <div style="padding:12px 14px;display:flex;gap:12px;align-items:flex-start">
-                  <div style="flex:1;min-width:0">
-                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
-                      <span style="font-weight:700;font-size:14px">${esc(it.name)}</span>
-                      <span style="font-size:10px;font-weight:700;color:${rarity.color};
-                        background:${rarity.color}18;border-radius:10px;padding:1px 7px">${it.rarity||'일반'}</span>
-                    </div>
-                    <div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap">
-                      <span class="tag" style="font-size:10px">${esc(it.cat||'기타')}</span>
-                      ${it.chars ? `<span style="font-size:11px;color:var(--teal)">👤 ${esc(it.chars)}</span>` : ''}
-                    </div>
-                    ${it.desc ? `<div style="font-size:12px;color:var(--muted);line-height:1.6;
-                      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(it.desc)}</div>` : ''}
-                    ${it.chapter ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">📖 ${esc(it.chapter)}</div>` : ''}
-                  </div>
-                </div>
-                <div style="display:flex;border-top:1px solid var(--border)">
-                  <button onclick="showItemModal(${idx})"
-                    style="flex:1;padding:7px;background:none;border:none;cursor:pointer;
-                      font-size:12px;color:var(--teal);font-family:'Noto Sans KR',sans-serif">✏️ 수정</button>
-                  <button onclick="deleteItem(${idx})"
-                    style="flex:1;padding:7px;background:none;border:none;cursor:pointer;
-                      font-size:12px;color:var(--rust);font-family:'Noto Sans KR',sans-serif">🗑️ 삭제</button>
-                </div>
-              </div>`;}
-            ).join('')}
-          </div>`}
+      <div id="item-grid-wrap"></div>
     </div>`;
+  renderItemGrid();
+}
+
+function renderItemGrid() {
+  const p = getProject();
+  const items = p.items || [];
+  const filter     = window._itemFilter || '전체';
+  const charFilter = window._itemCharFilter || '전체';
+  const sq         = (window._itemSearch || '').trim().toLowerCase();
+  const rarityOrder = ITEM_RARITIES.map(r => r.label).reverse();
+
+  const parentGroup = ITEM_GROUPS.find(g => g.group === filter);
+  const baseFiltered = filter === '전체' ? items
+    : parentGroup ? items.filter(it => parentGroup.cats.includes(it.cat))
+    : items.filter(it => it.cat === filter);
+  const charFiltered = charFilter === '전체' ? baseFiltered
+    : baseFiltered.filter(it => it.chars && it.chars.includes(charFilter));
+  const searchFiltered = sq
+    ? charFiltered.filter(it =>
+        (it.name||'').toLowerCase().includes(sq) ||
+        (it.desc||'').toLowerCase().includes(sq))
+    : charFiltered;
+  const filtered = [...searchFiltered].sort((a, b) => {
+    const ai = rarityOrder.indexOf(a.rarity || '일반');
+    const bi = rarityOrder.indexOf(b.rarity || '일반');
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  const grid = document.getElementById('item-grid-wrap');
+  if (!grid) return;
+
+  // × 버튼 표시 갱신
+  const clearBtn = document.getElementById('item-search-clear');
+  if (clearBtn) clearBtn.style.display = sq ? 'block' : 'none';
+
+  grid.innerHTML = filtered.length === 0
+    ? `<div class="card empty-state"><div class="emoji">📦</div><p>${items.length===0?'아이템을 추가해보세요.':'검색 결과가 없어요.'}</p></div>`
+    : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
+        ${filtered.map(it => {
+          const idx = items.indexOf(it);
+          const rarity = ITEM_RARITIES.find(r=>r.label===it.rarity) || ITEM_RARITIES[0];
+          return `
+          <div class="card card-sm" style="padding:0;overflow:hidden;border-top:3px solid ${rarity.color}">
+            <div style="padding:12px 14px;display:flex;gap:12px;align-items:flex-start">
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
+                  <span style="font-weight:700;font-size:14px">${esc(it.name)}</span>
+                  <span style="font-size:10px;font-weight:700;color:${rarity.color};
+                    background:${rarity.color}18;border-radius:10px;padding:1px 7px">${it.rarity||'일반'}</span>
+                </div>
+                <div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap">
+                  <span class="tag" style="font-size:10px">${esc(it.cat||'기타')}</span>
+                  ${it.chars ? `<span style="font-size:11px;color:var(--teal)">👤 ${esc(it.chars)}</span>` : ''}
+                </div>
+                ${it.desc ? `<div style="font-size:12px;color:var(--muted);line-height:1.6;
+                  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(it.desc)}</div>` : ''}
+                ${it.chapter ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">📖 ${esc(it.chapter)}</div>` : ''}
+              </div>
+            </div>
+            <div style="display:flex;border-top:1px solid var(--border)">
+              <button onclick="showItemModal(${idx})"
+                style="flex:1;padding:7px;background:none;border:none;cursor:pointer;
+                  font-size:12px;color:var(--teal);font-family:'Noto Sans KR',sans-serif">✏️ 수정</button>
+              <button onclick="deleteItem(${idx})"
+                style="flex:1;padding:7px;background:none;border:none;cursor:pointer;
+                  font-size:12px;color:var(--rust);font-family:'Noto Sans KR',sans-serif">🗑️ 삭제</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
 }
 
 function showItemModal(idx) {
