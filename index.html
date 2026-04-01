@@ -629,9 +629,9 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
     <div id="header-actions" style="display:flex;align-items:center;gap:4px;flex-shrink:0">
       <button class="header-btn" onclick="toggleDarkMode()" id="btn-darkmode" title="다크모드 전환" style="font-size:16px;padding:5px 8px">🌙</button>
       <button class="header-btn" onclick="toggleThemePicker()" id="btn-theme" title="테마 색상" style="font-size:16px;padding:5px 8px">🎨</button>
-      <button class="header-btn" id="fs-status-btn" onclick="fsConnect()" title="로컬 파일에 자동저장" style="font-size:16px;padding:5px 8px">💾 파일 연결</button>
+
       <button class="header-btn" onclick="document.getElementById('import-single-file').click()" id="btn-load-project" style="display:none">📂 <span class="btn-text">작품 불러오기</span></button>
-      <button class="header-btn gold" onclick="exportCurrentProject()" id="btn-save-project" style="display:none">💾 <span class="btn-text">작품 저장</span></button>
+      <button class="header-btn gold" onclick="exportCurrentProject()" id="btn-save-project" style="display:none" title="현재 작품을 날짜별 백업 파일로 저장">📦 <span class="btn-text">백업 저장</span></button>
     </div>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
     <input type="file" id="import-single-file" accept=".json" style="display:none" onchange="importSingleProject(event)">
@@ -818,7 +818,7 @@ function exportCurrentProject() {
   a.href = URL.createObjectURL(blob);
   a.download = (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
-  toast(`"${p.title||'작품'}" 저장 완료 💾`);
+  toast(`"${p.title||'작품'}" 백업 저장 완료 📦`);
 }
 
 function exportSingleProject(pid) {
@@ -5440,8 +5440,10 @@ document.addEventListener('keydown', e => {
     if (overlay && overlay.classList.contains('active')) {
       e.preventDefault();
       saveToStorage();
-      if (fsAutoSaveEnabled) fsSave();
-      showSavedBanner(true);
+      fsSaveToLocal().then(result => {
+        if (result === true) showSavedBanner(true);
+        else if (result === false) showSavedBanner(false);
+      });
     }
   }
 });
@@ -5931,21 +5933,15 @@ document.addEventListener('keydown', e => {
   // ESC → 모달 닫기
   if (e.key === 'Escape') { closeModal(); return; }
 
-  // Ctrl+S → 앱 내 저장 (어디서든)
+  // Ctrl+S → 로컬 파일 저장
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     e.preventDefault();
     const p = getProject();
     if (p) {
-      try {
-        saveToStorage();
-        setLastBackupTime();
-        const editor = document.getElementById('prose-editor');
-        const isEditing = editor && document.activeElement === editor;
-        if (isEditing) {
-          // 집필기: 화면 중앙 배너
-          showSavedBanner(true);
-        } else {
-          // 그 외: 헤더 타이틀 + 토스트
+      saveToStorage();
+      setLastBackupTime();
+      fsSaveToLocal().then(result => {
+        if (result === true) {
           showSavedBanner(true);
           const titleBtn = document.getElementById('header-title');
           if (titleBtn) {
@@ -5954,10 +5950,11 @@ document.addEventListener('keydown', e => {
             titleBtn.style.color = 'var(--gold2)';
             setTimeout(() => { titleBtn.innerHTML = orig; titleBtn.style.color = ''; }, 1200);
           }
+        } else if (result === false) {
+          showSavedBanner(false);
         }
-      } catch(err) {
-        showSavedBanner(false);
-      }
+        // null = 사용자 취소, 아무것도 안 함
+      });
     } else {
       toast('저장할 작품을 먼저 열어주세요.');
     }
@@ -6194,87 +6191,53 @@ function changeFontSize(delta) {
 
 
 // ═══════════════════════════════════════════════════════════
-// 자동 저장 (고정 파일명 다운로드 방식)
+// 로컬 파일 저장 (File System Access API)
 // ═══════════════════════════════════════════════════════════
-let fsAutoSaveEnabled = false;
-let fsFileHandle = null; // 호환성 유지용 (미사용)
-const FS_SUPPORTED = true; // 항상 지원
+let _fsFileHandle = null; // 현재 세션에서 연결된 파일 핸들
+const FS_SUPPORTED = ('showSaveFilePicker' in window);
 
-function fsSaveAsDownload() {
-  try {
-    const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'wnstudio-autosave.json';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    return true;
-  } catch(e) {
-    console.error('fsSaveAsDownload error:', e);
-    return false;
-  }
-}
+// Ctrl+S 시 호출 — 핸들 없으면 파일 선택, 있으면 덮어쓰기
+async function fsSaveToLocal() {
+  const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
+  const json = JSON.stringify(data, null, 2);
 
-async function fsSave() {
-  return fsSaveAsDownload();
-}
-
-function fsConnect() {
-  fsAutoSaveEnabled = true;
-  localStorage.setItem('wnstudio_autosave','on');
-  updateFsStatus();
-  fsSave();
-  toast('✓ 자동저장 켜짐! Ctrl+S마다 wnstudio-autosave.json 으로 저장돼요.');
-}
-
-function fsDisconnect() {
-  fsAutoSaveEnabled = false;
-  localStorage.removeItem('wnstudio_autosave');
-  updateFsStatus();
-  toast('자동저장이 꺼졌어요.');
-}
-
-function updateFsStatus() {
-  const btn = document.getElementById('fs-status-btn');
-  if (!btn) return;
-  btn.style.fontSize = '16px';
-  if (fsAutoSaveEnabled) {
-    btn.textContent = '💾 자동저장 ON';
-    btn.style.borderColor = 'var(--teal)';
-    btn.style.color = 'var(--teal)';
-    btn.title = '클릭하면 끄기';
-    btn.onclick = fsDisconnect;
+  if (FS_SUPPORTED) {
+    try {
+      if (!_fsFileHandle) {
+        _fsFileHandle = await window.showSaveFilePicker({
+          suggestedName: 'hopil-studio.json',
+          types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+        });
+      }
+      const writable = await _fsFileHandle.createWritable();
+      await writable.write(json);
+      await writable.close();
+      return true;
+    } catch(e) {
+      // 사용자가 취소한 경우 (AbortError) — 그냥 무시
+      if (e.name === 'AbortError') return null;
+      // 핸들이 무효화된 경우 재시도
+      _fsFileHandle = null;
+      return false;
+    }
   } else {
-    btn.textContent = '💾 자동저장';
-    btn.style.borderColor = '';
-    btn.style.color = '';
-    btn.title = 'Ctrl+S 시 파일로 저장';
-    btn.onclick = fsConnect;
+    // File System Access API 미지원 브라우저 — 다운로드 폴백
+    try {
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'hopil-studio.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return true;
+    } catch(e) {
+      return false;
+    }
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-// 자동저장 상태 복원
-// ═══════════════════════════════════════════════════════════
-function openFsDb() { return Promise.resolve(null); }
-async function saveFsHandle() {}
-async function loadFsHandle() { return null; }
-async function clearFsHandle() {
-  try { localStorage.removeItem('wnstudio_autosave'); } catch(e) {}
-}
-
-async function tryAutoReconnect() {
-  // 이전 세션에서 자동저장이 켜져 있었으면 복원
-  if (localStorage.getItem('wnstudio_autosave') === 'on') {
-    fsAutoSaveEnabled = true;
-    updateFsStatus();
-  }
-}
-
-async function fsReconnect() {}
+async function tryAutoReconnect() {}  // 이전 버전 호환용 (빈 함수)
 
 
 const CHAR_COLORS = [
@@ -7788,7 +7751,7 @@ initColorTheme();
 applyEditorFontSize();
 renderHome();
 history.replaceState({screen:'home'}, '');
-setTimeout(() => { updateFsStatus(); tryAutoReconnect(); }, 300);
+setTimeout(() => { tryAutoReconnect(); }, 300);
 
 // 뒤로가기 처리
 window.addEventListener('popstate', e => {
