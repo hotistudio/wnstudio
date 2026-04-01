@@ -6226,99 +6226,31 @@ function changeFontSize(delta) {
 
 // ═══════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════
-// 로컬 파일 저장 (File System Access API + IndexedDB 핸들 유지)
+// 로컬 파일 저장 (File System Access API)
 // ═══════════════════════════════════════════════════════════
 let _fsFileHandle = null;
 const FS_SUPPORTED = ('showSaveFilePicker' in window);
-const FS_DB_NAME = 'hopil_fs', FS_STORE = 'handles', FS_KEY = 'main';
 
-// IndexedDB에서 핸들 불러오기
-function fsOpenDB() {
-  return new Promise((res, rej) => {
-    const req = indexedDB.open(FS_DB_NAME, 1);
-    req.onupgradeneeded = e => e.target.result.createObjectStore(FS_STORE);
-    req.onsuccess = e => res(e.target.result);
-    req.onerror = () => rej();
-  });
-}
-async function fsLoadHandle() {
-  try {
-    const db = await fsOpenDB();
-    return new Promise(res => {
-      const req = db.transaction(FS_STORE).objectStore(FS_STORE).get(FS_KEY);
-      req.onsuccess = e => res(e.target.result || null);
-      req.onerror = () => res(null);
-    });
-  } catch { return null; }
-}
-async function fsSaveHandle(handle) {
-  try {
-    const db = await fsOpenDB();
-    return new Promise(res => {
-      const req = db.transaction(FS_STORE, 'readwrite').objectStore(FS_STORE).put(handle, FS_KEY);
-      req.onsuccess = () => res(true);
-      req.onerror = () => res(false);
-    });
-  } catch { return false; }
-}
-async function fsClearHandle() {
-  try {
-    const db = await fsOpenDB();
-    db.transaction(FS_STORE, 'readwrite').objectStore(FS_STORE).delete(FS_KEY);
-  } catch {}
-}
-
-// Ctrl+S 시 호출
+// Ctrl+S 시 호출 — 처음 한 번만 파일 선택, 이후엔 덮어쓰기
 async function fsSaveToLocal() {
   const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
   const json = JSON.stringify(data, null, 2);
 
   if (FS_SUPPORTED) {
     try {
-      // 메모리 핸들 없으면 IndexedDB에서 복원
       if (!_fsFileHandle) {
-        _fsFileHandle = await fsLoadHandle();
+        _fsFileHandle = await window.showSaveFilePicker({
+          suggestedName: 'hopil-studio.json',
+          types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+        });
       }
-
-      // 핸들 있으면 권한 요청 (탭 재열기 시 브라우저 팝업 한 번)
-      if (_fsFileHandle) {
-        try {
-          const perm = await _fsFileHandle.queryPermission({ mode: 'readwrite' });
-          if (perm !== 'granted') {
-            const req = await _fsFileHandle.requestPermission({ mode: 'readwrite' });
-            if (req !== 'granted') {
-              // 거부 → 핸들 유지 (다음 Ctrl+S 때 다시 시도)
-              return null;
-            }
-          }
-          // 바로 덮어쓰기
-          const writable = await _fsFileHandle.createWritable();
-          await writable.write(json);
-          await writable.close();
-          return true;
-        } catch(e) {
-          if (e.name === 'AbortError') return null;
-          // 파일이 삭제됐거나 핸들 무효 → 핸들 초기화 후 새로 선택
-          _fsFileHandle = null;
-          await fsClearHandle();
-        }
-      }
-
-      // 핸들 없음 → 파일 선택 다이얼로그 (최초 1회)
-      _fsFileHandle = await window.showSaveFilePicker({
-        suggestedName: 'hopil-studio.json',
-        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
-      });
-      await fsSaveHandle(_fsFileHandle);
       const writable = await _fsFileHandle.createWritable();
       await writable.write(json);
       await writable.close();
       return true;
-
     } catch(e) {
       if (e.name === 'AbortError') return null;
       _fsFileHandle = null;
-      await fsClearHandle();
       return false;
     }
   } else {
@@ -6334,13 +6266,7 @@ async function fsSaveToLocal() {
   }
 }
 
-// 앱 시작 시 저장된 핸들 복원 (조용히)
-async function tryAutoReconnect() {
-  if (!FS_SUPPORTED) return;
-  const handle = await fsLoadHandle();
-  if (handle) _fsFileHandle = handle;
-}
-
+async function tryAutoReconnect() {}
 
 const CHAR_COLORS = [
   {v:'#ffcccc',label:'빨강'},
