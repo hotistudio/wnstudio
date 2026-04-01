@@ -7071,8 +7071,6 @@ function showItemModal(idx) {
   showModal(`
     <div class="modal-title">${idx !== undefined ? '아이템 수정' : '아이템 추가'}</div>
     <div class="form-grid">
-      <div><label class="label">이모지 아이콘</label>
-        <input id="it-icon" value="${esc(it.icon||'')}" placeholder="예: ⚔️ 🛡️ 💊" style="font-size:20px;text-align:center"></div>
       <div><label class="label">아이템명 *</label>
         <input id="it-name" value="${esc(it.name||'')}" placeholder="아이템 이름"></div>
       <div><label class="label">카테고리</label>
