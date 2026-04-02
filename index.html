@@ -697,6 +697,10 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="13"/><circle cx="5" cy="18" r="3"/><circle cx="19" cy="18" r="3"/><line x1="12" y1="13" x2="5" y2="15"/><line x1="12" y1="13" x2="19" y2="15"/></svg>
           인물 관계도
         </button>
+        <button class="nav-item" onclick="navigate('glossary')" data-tab="glossary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="12" y1="7" x2="16" y2="7"/><line x1="12" y1="11" x2="16" y2="11"/><line x1="9" y1="7" x2="9.01" y2="7"/><line x1="9" y1="11" x2="9.01" y2="11"/></svg>
+          용어 사전 <span class="nav-badge" id="badge-glossary"></span>
+        </button>
         <button class="nav-item" onclick="navigate('items')" data-tab="items">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
           아이템 사전 <span class="nav-badge" id="badge-items"></span>
@@ -1137,6 +1141,7 @@ function navigate(tab) {
     chronicle: renderChronicle,
     stats: renderStats,
     items: renderItems,
+    glossary: renderGlossary,
   };
 
   if (renders[tab]) renders[tab]();
@@ -1189,6 +1194,7 @@ function updateBadges() {
     chapters: (p.chapters||[]).length,
     psyarc: (p.psyArcs||[]).length,
     items: (p.items||[]).length,
+    glossary: (p.glossary||[]).length,
   };
   Object.entries(b).forEach(([k,v]) => {
     const el = document.getElementById('badge-'+k);
@@ -2294,6 +2300,9 @@ function renderChapters() {
               touch-action:none;user-select:none;padding:0 2px">⠿</span>
           <div style="flex:1;min-width:0">
             <div class="chapter-item-title">${esc(c.title)}</div>
+            ${c.summary ? `<div style="font-size:10px;color:var(--muted);margin-bottom:2px;
+              overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+              font-style:italic;line-height:1.4">${esc(c.summary)}</div>` : ''}
             <div class="chapter-item-meta">
               <span>${(c.content||'').length.toLocaleString()}자</span>
               <span class="status-badge s-${esc(c.status)}" style="font-size:10px;padding:1px 6px">${esc(c.status)}</span>
@@ -2415,6 +2424,7 @@ function renderEditorContent(ch) {
           </select>
           <span class="wordcount" id="wc-display">${(ch.content||'').length.toLocaleString()}자</span>
           <div style="flex:1"></div>
+          <button class="btn btn-outline btn-sm" onclick="toggleFindReplace()" id="find-replace-btn" title="찾기/바꾸기 (Ctrl+H)" style="font-size:13px">🔍 찾기</button>
           <button class="btn btn-outline btn-sm" onclick="toggleSplitPanel()" id="split-toggle-btn" title="참고 패널" style="font-size:12px">⊞ 참고</button>
           <div style="display:flex;align-items:center;gap:3px;background:var(--cream);border:1px solid var(--border);border-radius:7px;padding:2px 6px">
             <button onclick="changeFontSize(-1)" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--muted);padding:2px 3px;font-weight:700">−</button>
@@ -2431,6 +2441,35 @@ function renderEditorContent(ch) {
           <div class="symbol-palette" id="symbol-palette" style="display:none;flex-wrap:wrap;"></div>
         </div>
         <div id="shortcut-bar" style="padding:6px 12px;background:var(--cream);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:4px;flex-wrap:wrap;flex-shrink:0;"></div>
+        <div style="padding:5px 16px;background:var(--gold-light);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <span style="font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0">📝 회차 요약</span>
+          <input id="chapter-summary-input" value="${esc(ch.summary||'')}"
+            placeholder="이 화의 핵심 내용을 한 줄로 요약하세요 (화 목록에 표시됩니다)"
+            onchange="updateChapter('${ch.id}','summary',this.value)"
+            style="flex:1;font-size:12px;padding:4px 8px;border-radius:6px;background:var(--white);border:1px solid var(--border);color:var(--ink)">
+        </div>
+        <div id="find-replace-panel" style="display:none;padding:10px 16px;background:var(--cream);border-bottom:1.5px solid var(--border);flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:200px">
+              <input id="fr-find" placeholder="찾을 내용" style="flex:1;min-width:80px;padding:6px 10px;font-size:13px"
+                oninput="frHighlight()" onkeydown="if(event.key==='Enter')frNext()">
+              <span id="fr-count" style="font-size:11px;color:var(--muted);white-space:nowrap;min-width:40px"></span>
+              <button class="btn btn-outline btn-sm" onclick="frPrev()" title="이전">↑</button>
+              <button class="btn btn-outline btn-sm" onclick="frNext()" title="다음">↓</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:200px">
+              <input id="fr-replace" placeholder="바꿀 내용" style="flex:1;min-width:80px;padding:6px 10px;font-size:13px">
+              <button class="btn btn-outline btn-sm" onclick="frReplace()">바꾸기</button>
+              <button class="btn btn-gold btn-sm" onclick="frReplaceAll()">모두 바꾸기</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);cursor:pointer">
+                <input type="checkbox" id="fr-case" onchange="frHighlight()"> 대소문자
+              </label>
+              <button onclick="closeFindReplace()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0 4px">×</button>
+            </div>
+          </div>
+        </div>
         <div class="editor-content" style="flex:1;overflow-y:auto;">
           <textarea id="prose-editor" placeholder="이야기를 시작하세요..."
             oninput="onEditorInput('${ch.id}',this.value)">${esc(ch.content||'')}</textarea>
@@ -2446,6 +2485,7 @@ function renderEditorContent(ch) {
             <button class="split-tab" onclick="switchSplitTab('characters')">👤 인물</button>
             <button class="split-tab" onclick="switchSplitTab('relations')">🔗 관계도</button>
             <button class="split-tab" onclick="switchSplitTab('family')">🏰 가문</button>
+            <button class="split-tab" onclick="switchSplitTab('glossary')">📖 용어</button>
             <button class="split-tab" onclick="switchSplitTab('items')">📦 아이템</button>
             <button class="split-tab" onclick="switchSplitTab('memo')">📝 메모</button>
           </div>
@@ -5327,7 +5367,112 @@ function renderSplitContent() {
             </div>`}
           </div>`;}).join('')}
     `;
+  } else if (splitTab === 'glossary') {
+    el.innerHTML = renderSplitGlossary();
   }
+}
+
+
+function renderSplitGlossary() {
+  const p = getProject();
+  const list = p.glossary || [];
+  if (!window._glossaryPanelQ) window._glossaryPanelQ = '';
+  if (!window._glossaryPanelCat) window._glossaryPanelCat = '전체';
+  if (!window._glossaryPanelOpen) window._glossaryPanelOpen = {};
+  const q = window._glossaryPanelQ.trim().toLowerCase();
+  const cat = window._glossaryPanelCat;
+
+  const filtered = list.filter(g =>
+    (cat === '전체' || g.cat === cat) &&
+    (!q || g.term.toLowerCase().includes(q) || (g.desc||'').toLowerCase().includes(q))
+  );
+
+  const catBtns = ['전체', ...GLOSSARY_CATS].map(c =>
+    '<button onclick="window._glossaryPanelCat=\'' + c + '\';refreshSplitGlossary()" '
+    + 'style="padding:2px 8px;border-radius:12px;border:1px solid '
+    + (cat===c ? 'var(--gold)' : 'var(--border)') + ';background:'
+    + (cat===c ? 'var(--gold)' : 'transparent') + ';color:'
+    + (cat===c ? '#fff' : 'var(--muted)') + ';font-size:11px;cursor:pointer;white-space:nowrap">' + c + '</button>'
+  ).join('');
+
+  const cards = filtered.length === 0
+    ? '<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px 0">'
+      + (list.length === 0 ? '용어가 없어요' : '검색 결과 없음') + '</div>'
+    : filtered.map(g => {
+        const idx = list.indexOf(g);
+        const open = !!window._glossaryPanelOpen[idx];
+        return '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:6px;overflow:hidden">'
+          // 헤더
+          + '<div style="display:flex;align-items:center;gap:6px;padding:8px 10px;cursor:pointer;background:var(--cream)" '
+          + 'onclick="window._glossaryPanelOpen[' + idx + ']=!' + open + ';refreshSplitGlossary()">'
+          + '<span style="flex:1;font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(g.term) + '</span>'
+          + (g.alias ? '<span style="font-size:10px;color:var(--muted)">' + esc(g.alias) + '</span>' : '')
+          + '<span style="font-size:10px;color:var(--teal);flex-shrink:0">' + esc(g.cat||'기타') + '</span>'
+          + '<span style="font-size:10px;color:var(--muted);flex-shrink:0;margin-left:2px">' + (open ? '▴' : '▾') + '</span>'
+          + '</div>'
+          // 펼쳐진 편집 폼
+          + (open ? '<div style="padding:10px;background:var(--paper);display:flex;flex-direction:column;gap:6px" onclick="event.stopPropagation()">'
+            + '<div style="display:flex;gap:6px">'
+            + '<input value="' + esc(g.term) + '" placeholder="용어명" '
+            + 'oninput="updateSplitGlossary(' + idx + ',\'term\',this.value)" '
+            + 'style="flex:1;font-size:12px;padding:5px 8px;font-weight:700">'
+            + '<select onchange="updateSplitGlossary(' + idx + ',\'cat\',this.value)" style="font-size:11px;padding:5px 6px;width:80px">'
+            + GLOSSARY_CATS.map(c => '<option value="' + c + '"' + (g.cat===c?' selected':'') + '>' + c + '</option>').join('')
+            + '</select>'
+            + '</div>'
+            + '<input value="' + esc(g.alias||'') + '" placeholder="별칭 (선택)" '
+            + 'oninput="updateSplitGlossary(' + idx + ',\'alias\',this.value)" '
+            + 'style="font-size:11px;padding:5px 8px;color:var(--muted)">'
+            + '<textarea rows="3" placeholder="설명" '
+            + 'oninput="updateSplitGlossary(' + idx + ',\'desc\',this.value)" '
+            + 'style="font-size:12px;padding:6px 8px;line-height:1.6;resize:vertical">' + esc(g.desc||'') + '</textarea>'
+            + '<input value="' + esc(g.related||'') + '" placeholder="관련 용어" '
+            + 'oninput="updateSplitGlossary(' + idx + ',\'related\',this.value)" '
+            + 'style="font-size:11px;padding:5px 8px;color:var(--teal)">'
+            + '<div style="display:flex;justify-content:flex-end">'
+            + '<button onclick="deleteSplitGlossary(' + idx + ')" '
+            + 'style="font-size:11px;color:var(--rust);background:none;border:none;cursor:pointer;padding:2px 4px">🗑️ 삭제</button>'
+            + '</div>'
+            + '</div>' : '')
+          + '</div>';
+      }).join('');
+
+  return '<div style="padding:4px 0">'
+    + '<div style="display:flex;gap:6px;margin-bottom:8px">'
+    + '<input placeholder="🔍 용어 검색..." value="' + esc(window._glossaryPanelQ) + '" '
+    + 'oninput="window._glossaryPanelQ=this.value;refreshSplitGlossary()" '
+    + 'style="flex:1;padding:6px 10px;font-size:12px">'
+    + '<button class="btn btn-gold btn-sm" onclick="showGlossaryModal();setTimeout(()=>{ const m=document.getElementById(\'modal-bg\'); if(m){ const obs=new MutationObserver(()=>{ obs.disconnect(); refreshSplitGlossary(); }); obs.observe(m,{attributes:true,attributeFilter:[\'style\']}); } },100)">＋</button>'
+    + '</div>'
+    + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">' + catBtns + '</div>'
+    + cards
+    + '</div>';
+}
+
+function refreshSplitGlossary() {
+  // 일반 참고 패널
+  const el = document.getElementById('split-content');
+  if (el && splitTab === 'glossary') el.innerHTML = renderSplitGlossary();
+  // 집중 모드 참고 패널
+  const fel = document.getElementById('focus-ref-content');
+  if (fel && _focusRefTab === 'glossary') fel.innerHTML = renderSplitGlossary();
+}
+
+function updateSplitGlossary(idx, key, val) {
+  const p = getProject();
+  if (!p || !p.glossary || !p.glossary[idx]) return;
+  p.glossary[idx][key] = val;
+  clearTimeout(window._glossarySaveTimer);
+  window._glossarySaveTimer = setTimeout(() => { autoSave(); updateBadges(); }, 600);
+}
+
+function deleteSplitGlossary(idx) {
+  confirmDialog('이 용어를 삭제합니다.', () => {
+    getProject().glossary.splice(idx, 1);
+    delete window._glossaryPanelOpen[idx];
+    autoSave(); updateBadges(); refreshSplitGlossary();
+    toast('삭제했어요.');
+  });
 }
 
 // 참고 패널에서 작품 기본 정보 수정
@@ -5439,7 +5584,7 @@ function focusRefTab(tab) {
   _focusRefTab = tab;
   const tabLabelMap = {
     overview:'개요', world:'세계관', plot:'플롯',
-    characters:'인물', family:'가문', items:'아이템', memo:'메모'
+    characters:'인물', family:'가문', glossary:'용어', items:'아이템', memo:'메모'
   };
   const label = tabLabelMap[tab];
   document.querySelectorAll('#focus-ref-panel .split-tab').forEach(b => {
@@ -6106,6 +6251,13 @@ function closeModal() {
 }
 // Ctrl+S 브라우저 기본 동작 완전 차단 (캡처 단계)
 window.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+    if (state.activeTab === 'chapters') {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleFindReplace();
+    }
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     e.preventDefault();
     e.stopPropagation();
@@ -6131,6 +6283,13 @@ window.addEventListener('keydown', e => {
       });
     } else {
       toast('저장할 작품을 먼저 열어주세요.');
+    }
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+    if (getProject() && state.activeTab === 'chapters') {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleFindReplace();
     }
   }
 }, true);
@@ -6516,8 +6675,60 @@ function recordDailyWriting(chars) {
   if (!pid) return;
   const today = getTodayStr();
   if (!stats[pid]) stats[pid] = {};
-  stats[pid][today] = (stats[pid][today] || 0) + chars;
+  const prevCount = stats[pid][today] || 0;
+  stats[pid][today] = prevCount + chars;
   saveStats(stats);
+  // 목표 달성 감지 (넘는 순간 한 번만)
+  const goal = getWritingGoal();
+  if (prevCount < goal && stats[pid][today] >= goal) {
+    setTimeout(() => launchConfetti(), 100);
+  }
+}
+
+function launchConfetti() {
+  // 기존 캔버스 제거
+  const old = document.getElementById('confetti-canvas');
+  if (old) old.remove();
+
+  const canvas = document.createElement('canvas');
+  canvas.id = 'confetti-canvas';
+  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:99999;pointer-events:none';
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  document.body.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+  const pieces = Array.from({length: 120}, () => ({
+    x: Math.random() * canvas.width,
+    y: -10 - Math.random() * 100,
+    r: 4 + Math.random() * 6,
+    d: 2 + Math.random() * 3,
+    color: `hsl(${Math.random()*360},90%,60%)`,
+    tilt: Math.random() * 10 - 5,
+    tiltAngle: 0,
+    tiltSpeed: 0.1 + Math.random() * 0.1,
+  }));
+
+  toast('🎉 오늘 목표 달성! 수고했어요!');
+
+  let frame = 0;
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pieces.forEach(p => {
+      p.tiltAngle += p.tiltSpeed;
+      p.y += p.d;
+      p.x += Math.sin(p.tiltAngle) * 1.5;
+      p.tilt = Math.sin(p.tiltAngle) * 10;
+      ctx.beginPath();
+      ctx.fillStyle = p.color;
+      ctx.ellipse(p.x, p.y, p.r, p.r * 0.4, p.tilt, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    frame++;
+    if (frame < 180) requestAnimationFrame(draw);
+    else canvas.remove();
+  }
+  draw();
 }
 function getWritingGoal() {
   try { return parseInt(localStorage.getItem('wnstudio_goal') || '1000'); } catch(e) { return 1000; }
@@ -7243,6 +7454,292 @@ function renderItemGrid() {
       </div>`;
 }
 
+
+// ═══════════════════════════════════════════════════════════
+// 용어 사전 (GLOSSARY)
+// ═══════════════════════════════════════════════════════════
+const GLOSSARY_CATS = ['인물명','지명','마법/기술','아이템','조직/세력','언어/문자','용어','기타'];
+
+function renderGlossary() {
+  const p = getProject();
+  const list = p.glossary || [];
+  if (!window._glossarySearch) window._glossarySearch = '';
+  if (!window._glossaryCat)    window._glossaryCat = '전체';
+  const q   = window._glossarySearch.trim().toLowerCase();
+  const cat = window._glossaryCat;
+  const filtered = list.filter(g =>
+    (cat === '전체' || g.cat === cat) &&
+    (!q || g.term.toLowerCase().includes(q) || (g.desc||'').toLowerCase().includes(q))
+  );
+  const catCounts = {};
+  GLOSSARY_CATS.forEach(c => { catCounts[c] = list.filter(g => g.cat === c).length; });
+  const catBtns = ['전체',...GLOSSARY_CATS].map(c => {
+    const active = cat === c;
+    const cnt = c !== '전체' && catCounts[c] ? ` <span style="opacity:.7">${catCounts[c]}</span>` : '';
+    return `<button onclick="window._glossaryCat='${c}';renderGlossary()"
+      style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;
+        border:1.5px solid ${active?'var(--gold)':'var(--border)'};
+        background:${active?'var(--gold)':'transparent'};
+        color:${active?'#fff':'var(--muted)'}">${c}${cnt}</button>`;
+  }).join('');
+  const cards = filtered.length === 0
+    ? `<div class="card empty-state"><div class="emoji">📖</div><p>${list.length===0?'용어를 추가해보세요.':'검색 결과가 없어요.'}</p></div>`
+    : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">${
+        filtered.map(g => {
+          const idx = list.indexOf(g);
+          return `<div class="card card-sm" style="padding:0;overflow:hidden">
+            <div style="padding:12px 14px">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
+                <div>
+                  <span style="font-weight:700;font-size:15px">${esc(g.term)}</span>
+                  ${g.pronunciation?`<span style="font-size:11px;color:var(--muted);margin-left:6px">[${esc(g.pronunciation)}]</span>`:''}
+                </div>
+                <span style="font-size:10px;background:var(--teal-light);color:var(--teal);border-radius:10px;padding:2px 8px;white-space:nowrap;flex-shrink:0">${esc(g.cat||'기타')}</span>
+              </div>
+              ${g.desc?`<p style="font-size:13px;color:var(--ink);line-height:1.7;margin-bottom:6px">${esc(g.desc)}</p>`:''}
+              ${g.alias?`<p style="font-size:11px;color:var(--muted)">별칭: ${esc(g.alias)}</p>`:''}
+            </div>
+            <div style="display:flex;border-top:1px solid var(--border)">
+              <button onclick="showGlossaryModal(${idx})" style="flex:1;padding:7px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--teal);font-family:'Noto Sans KR',sans-serif">✏️ 수정</button>
+              <button onclick="deleteGlossary(${idx})" style="flex:1;padding:7px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--rust);font-family:'Noto Sans KR',sans-serif">🗑️ 삭제</button>
+            </div>
+          </div>`;
+        }).join('')
+      }</div>`;
+  document.getElementById('main').innerHTML = `
+    <div style="max-width:900px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+        <div>
+          <h2 style="font-size:18px;font-weight:700;margin-bottom:4px">📖 용어 사전</h2>
+          <p style="font-size:12px;color:var(--muted)">작품 고유 용어, 설정 단어 등을 정리해두세요</p>
+        </div>
+        <button class="btn btn-gold" onclick="showGlossaryModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          용어 추가
+        </button>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+        <input placeholder="🔍 용어 검색..." value="${esc(window._glossarySearch)}"
+          oninput="window._glossarySearch=this.value;renderGlossary()"
+          style="flex:1;min-width:160px;max-width:260px;padding:8px 12px;font-size:13px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${catBtns}</div>
+      </div>
+      ${cards}
+    </div>`;
+}
+
+function renderGlossaryPanelHtml() {
+  const p = getProject();
+  const list = p.glossary || [];
+  if (!window._glossaryPanelQ) window._glossaryPanelQ = '';
+  const q = window._glossaryPanelQ.trim().toLowerCase();
+  const filtered = list.filter(g => !q || g.term.toLowerCase().includes(q) || (g.desc||'').toLowerCase().includes(q));
+  const items = filtered.length === 0
+    ? `<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px 0">용어가 없어요</div>`
+    : filtered.map(g => {
+        const idx = list.indexOf(g);
+        return `<div style="background:var(--cream);border-radius:8px;padding:10px 12px;cursor:pointer;margin-bottom:6px" onclick="showGlossaryModal(${idx})">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+            <span style="font-weight:700;font-size:13px">${esc(g.term)}</span>
+            <span style="font-size:10px;color:var(--teal)">${esc(g.cat||'기타')}</span>
+          </div>
+          ${g.desc?`<p style="font-size:12px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(g.desc)}</p>`:''}
+        </div>`;
+      }).join('');
+  return `<div style="padding:12px;display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;gap:6px;margin-bottom:4px">
+      <input placeholder="🔍 용어 검색..." value="${esc(window._glossaryPanelQ)}"
+        oninput="window._glossaryPanelQ=this.value;document.getElementById('glossary-panel-inner').innerHTML=renderGlossaryPanelHtml()"
+        style="flex:1;padding:6px 10px;font-size:12px">
+      <button class="btn btn-gold btn-sm" onclick="showGlossaryModal()">＋</button>
+    </div>
+    <div id="glossary-panel-inner">${items}</div>
+  </div>`;
+}
+
+function showGlossaryModal(idx) {
+  const p = getProject();
+  const g = idx !== undefined ? (p.glossary||[])[idx] : {};
+  showModal(`
+    <div class="modal-title">${idx !== undefined ? '용어 수정' : '용어 추가'}</div>
+    <div class="form-grid">
+      <div><label class="label">용어 *</label>
+        <input id="gl-term" value="${esc(g.term||'')}" placeholder="용어명"></div>
+      <div><label class="label">발음/표기</label>
+        <input id="gl-pron" value="${esc(g.pronunciation||'')}" placeholder="예: [마나], [아발론]"></div>
+      <div><label class="label">카테고리</label>
+        <select id="gl-cat">${GLOSSARY_CATS.map(c=>`<option value="${c}" ${(g.cat||'기타')===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div><label class="label">별칭/다른 이름</label>
+        <input id="gl-alias" value="${esc(g.alias||'')}" placeholder="예: 검은 마법사, 어둠의 군주"></div>
+      <div class="full"><label class="label">설명 *</label>
+        <textarea id="gl-desc" rows="4" placeholder="이 용어에 대한 설명을 입력하세요">${esc(g.desc||'')}</textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">취소</button>
+      <button class="btn btn-gold" onclick="saveGlossary(${idx !== undefined ? idx : 'undefined'})">저장</button>
+    </div>`);
+  setTimeout(() => document.getElementById('gl-term')?.focus(), 50);
+}
+
+function saveGlossary(idx) {
+  const p = getProject();
+  if (!p.glossary) p.glossary = [];
+  const term = document.getElementById('gl-term').value.trim();
+  if (!term) { toast('용어를 입력해주세요.'); return; }
+  const entry = {
+    term,
+    pronunciation: document.getElementById('gl-pron').value.trim(),
+    cat: document.getElementById('gl-cat').value,
+    alias: document.getElementById('gl-alias').value.trim(),
+    desc: document.getElementById('gl-desc').value.trim(),
+  };
+  if (idx !== undefined && idx !== 'undefined') p.glossary[idx] = entry;
+  else p.glossary.push(entry);
+  // 가나다순 정렬
+  p.glossary.sort((a,b) => a.term.localeCompare(b.term, 'ko'));
+  autoSave();
+  closeModal();
+  if (state.activeTab === 'glossary') renderGlossary();
+  refreshSplitGlossary();
+  updateBadges();
+  toast('용어가 저장됐어요 📖');
+}
+
+function deleteGlossary(idx) {
+  confirmDialog('이 용어를 삭제할까요?', () => {
+    const p = getProject();
+    p.glossary.splice(idx, 1);
+    autoSave();
+    renderGlossary();
+    updateBadges();
+    toast('삭제됐어요.');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// 찾기 / 바꾸기 (FIND & REPLACE)
+// ═══════════════════════════════════════════════════════════
+let _frMatches = [];
+let _frCurrent = -1;
+
+function toggleFindReplace() {
+  const panel = document.getElementById('find-replace-panel');
+  if (!panel) return;
+  const visible = panel.style.display !== 'none';
+  panel.style.display = visible ? 'none' : 'flex';
+  panel.style.flexDirection = 'column';
+  if (!visible) {
+    setTimeout(() => document.getElementById('fr-find')?.focus(), 50);
+  } else {
+    frClear();
+  }
+}
+
+function closeFindReplace() {
+  const panel = document.getElementById('find-replace-panel');
+  if (panel) panel.style.display = 'none';
+  frClear();
+}
+
+function frGetEditor() {
+  return document.getElementById('prose-editor') || document.getElementById('focus-editor');
+}
+
+function frHighlight() {
+  const q = document.getElementById('fr-find')?.value || '';
+  const caseSensitive = document.getElementById('fr-case')?.checked;
+  const ta = frGetEditor();
+  if (!ta || !q) { frClear(); return; }
+  const text = ta.value;
+  const flags = caseSensitive ? 'g' : 'gi';
+  const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+  _frMatches = [];
+  let m;
+  while ((m = regex.exec(text)) !== null) _frMatches.push(m.index);
+  _frCurrent = _frMatches.length > 0 ? 0 : -1;
+  frUpdateCount();
+  frScrollTo();
+}
+
+function frNext() {
+  if (_frMatches.length === 0) { frHighlight(); return; }
+  _frCurrent = (_frCurrent + 1) % _frMatches.length;
+  frUpdateCount();
+  frScrollTo();
+}
+
+function frPrev() {
+  if (_frMatches.length === 0) { frHighlight(); return; }
+  _frCurrent = (_frCurrent - 1 + _frMatches.length) % _frMatches.length;
+  frUpdateCount();
+  frScrollTo();
+}
+
+function frScrollTo() {
+  const ta = frGetEditor();
+  if (!ta || _frCurrent < 0 || _frMatches.length === 0) return;
+  const pos = _frMatches[_frCurrent];
+  const q = document.getElementById('fr-find')?.value || '';
+  ta.focus();
+  ta.setSelectionRange(pos, pos + q.length);
+  // 해당 위치로 스크롤
+  const lineHeight = parseInt(getComputedStyle(ta).lineHeight) || 24;
+  const lines = ta.value.substring(0, pos).split('\n').length;
+  ta.scrollTop = (lines - 3) * lineHeight;
+}
+
+function frUpdateCount() {
+  const el = document.getElementById('fr-count');
+  if (!el) return;
+  if (_frMatches.length === 0) {
+    el.textContent = '없음';
+    el.style.color = 'var(--rust)';
+  } else {
+    el.textContent = `${_frCurrent + 1}/${_frMatches.length}`;
+    el.style.color = 'var(--muted)';
+  }
+}
+
+function frReplace() {
+  const ta = frGetEditor();
+  if (!ta || _frCurrent < 0 || _frMatches.length === 0) return;
+  const q = document.getElementById('fr-find')?.value || '';
+  const r = document.getElementById('fr-replace')?.value || '';
+  const pos = _frMatches[_frCurrent];
+  const chId = ta.dataset.chid || ta.id;
+  const before = ta.value.substring(0, pos);
+  const after = ta.value.substring(pos + q.length);
+  ta.value = before + r + after;
+  ta.dispatchEvent(new Event('input'));
+  // 재검색
+  frHighlight();
+  toast('1개 바꿨어요.');
+}
+
+function frReplaceAll() {
+  const ta = frGetEditor();
+  if (!ta) return;
+  const q = document.getElementById('fr-find')?.value || '';
+  const r = document.getElementById('fr-replace')?.value || '';
+  const caseSensitive = document.getElementById('fr-case')?.checked;
+  if (!q) return;
+  const flags = caseSensitive ? 'g' : 'gi';
+  const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+  const count = (ta.value.match(regex)||[]).length;
+  if (count === 0) { toast('찾을 수 없어요.'); return; }
+  ta.value = ta.value.replace(regex, r);
+  ta.dispatchEvent(new Event('input'));
+  frClear();
+  toast(count + '개를 모두 바꿨어요 ✓');
+}
+
+function frClear() {
+  _frMatches = [];
+  _frCurrent = -1;
+  const el = document.getElementById('fr-count');
+  if (el) { el.textContent = ''; }
+}
+
 function showItemModal(idx) {
   const p = getProject();
   const it = idx !== undefined ? (p.items||[])[idx] : {};
@@ -7319,6 +7816,8 @@ function deleteItem(idx) {
     autoSave(); renderItems(); toast('삭제했어요.');
   });
 }
+
+
 
 function renderPsyArc() {
   const p = getProject();
@@ -8116,6 +8615,7 @@ document.addEventListener('visibilitychange', () => {
         <button class="split-tab" onclick="focusRefTab('plot')">📐 플롯</button>
         <button class="split-tab" onclick="focusRefTab('characters')">👤 인물</button>
         <button class="split-tab" onclick="focusRefTab('family')">🏰 가문</button>
+        <button class="split-tab" onclick="focusRefTab('glossary')">📖 용어</button>
         <button class="split-tab" onclick="focusRefTab('items')">📦 아이템</button>
         <button class="split-tab" onclick="focusRefTab('memo')">📝 메모</button>
       </div>
