@@ -4979,11 +4979,6 @@ function applyTypewriterMode() {
   const ta = document.getElementById('prose-editor');
   if (ta) {
     if (on) typewriterScroll(ta);
-    else {
-      // 패딩 원복
-      ta.closest('.editor-content').style.paddingTop = '';
-      ta.closest('.editor-content').style.paddingBottom = '';
-    }
   }
 }
 
@@ -4992,20 +4987,44 @@ function typewriterScroll(ta) {
   const ec = ta.closest('.editor-content');
   if (!ec) return;
 
-  // 커서 위치까지의 텍스트로 현재 줄 Y 좌표 계산
-  const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 32;
-  const text = ta.value.substring(0, ta.selectionStart);
-  const lines = text.split('\n').length;
-  const cursorY = (lines - 1) * lineHeight;
+  // mirror div로 커서까지의 정확한 높이 측정
+  let mirror = document.getElementById('_tw_mirror');
+  if (!mirror) {
+    mirror = document.createElement('div');
+    mirror.id = '_tw_mirror';
+    mirror.style.cssText = 'position:absolute;top:-9999px;left:-9999px;visibility:hidden;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:break-word;';
+    document.body.appendChild(mirror);
+  }
 
-  // 편집기 영역 높이의 절반만큼 패딩 추가해서 커서가 중앙에 오도록
-  const halfH = ec.clientHeight / 2;
-  ec.style.paddingTop = halfH + 'px';
-  ec.style.paddingBottom = halfH + 'px';
+  // textarea 스타일 복사
+  const cs = getComputedStyle(ta);
+  mirror.style.width = ta.clientWidth + 'px';
+  mirror.style.fontFamily = cs.fontFamily;
+  mirror.style.fontSize = cs.fontSize;
+  mirror.style.lineHeight = cs.lineHeight;
+  mirror.style.padding = cs.padding;
+  mirror.style.border = cs.border;
+  mirror.style.letterSpacing = cs.letterSpacing;
 
-  // 커서가 있는 줄이 화면 중앙에 오도록 스크롤
-  const scrollTarget = cursorY - halfH + lineHeight / 2;
-  ec.scrollTop = Math.max(0, scrollTarget);
+  // 커서 이전 텍스트 + span으로 커서 위치 마킹
+  const textBefore = ta.value.substring(0, ta.selectionStart);
+  mirror.innerHTML = textBefore.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n$/,'\n ') + '<span id="_tw_caret">|</span>';
+
+  const caret = document.getElementById('_tw_caret');
+  const caretTop = caret ? caret.offsetTop : 0;
+  const lineHeight = parseFloat(cs.lineHeight) || 32;
+
+  // textarea가 editor-content 기준으로 어디에 있는지
+  const taRect = ta.getBoundingClientRect();
+  const ecRect = ec.getBoundingClientRect();
+  const taOffsetInEc = taRect.top - ecRect.top + ec.scrollTop;
+
+  // 커서 줄의 절대 Y
+  const cursorAbsY = taOffsetInEc + caretTop;
+
+  // 중앙으로 스크롤
+  const target = cursorAbsY - (ec.clientHeight / 2) + (lineHeight / 2);
+  ec.scrollTop = Math.max(0, target);
 }
 
 // renderChapters 이후 상태 복원용
