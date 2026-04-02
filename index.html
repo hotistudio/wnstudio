@@ -4,17 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>호필 스튜디오</title>
-<script>
-window.onerror = function(msg, src, line, col, err) {
-  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;color:red;background:#fff;white-space:pre-wrap">'
-    + '🚨 오류 발생\n\n' + msg + '\n\n파일: ' + src + '\n라인: ' + line + ':' + col
-    + (err ? '\n\n' + err.stack : '') + '</div>';
-};
-window.addEventListener('unhandledrejection', function(e) {
-  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;color:red;background:#fff;white-space:pre-wrap">'
-    + '🚨 Promise 오류\n\n' + (e.reason?.stack || e.reason) + '</div>';
-});
-</script>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#18120a">
 <meta name="mobile-web-app-capable" content="yes">
@@ -8811,10 +8800,6 @@ window.addEventListener('popstate', e => {
 
 // PWA Service Worker 등록
 if ('serviceWorker' in navigator) {
-  // 기존 SW 전체 제거 후 재등록 (캐시 강제 초기화)
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    regs.forEach(r => r.unregister());
-  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')
       .then(reg => {
