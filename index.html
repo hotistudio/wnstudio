@@ -630,8 +630,9 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
       <button class="header-btn" onclick="toggleDarkMode()" id="btn-darkmode" title="다크모드 전환" style="font-size:16px;padding:5px 8px">🌙</button>
       <button class="header-btn" onclick="toggleThemePicker()" id="btn-theme" title="테마 색상" style="font-size:16px;padding:5px 8px">🎨</button>
 
+      <span id="file-status" style="margin-right:4px"></span>
       <button class="header-btn" onclick="document.getElementById('import-single-file').click()" id="btn-load-project" style="display:none">📂 <span class="btn-text">작품 불러오기</span></button>
-      <button class="header-btn gold" onclick="exportCurrentProject()" id="btn-save-project" style="display:none" title="현재 작품을 날짜별 백업 파일로 저장">📦 <span class="btn-text">백업 저장</span></button>
+      <button class="header-btn gold" onclick="exportCurrentProject()" id="btn-save-project" style="display:none" title="파일에 저장 (처음엔 파일 선택, 이후 같은 파일에 덮어쓰기)">💾 <span class="btn-text">파일 저장</span></button>
     </div>
     <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
     <input type="file" id="import-single-file" accept=".json" style="display:none" onchange="importSingleProject(event)">
@@ -765,8 +766,39 @@ function getProject() {
   return state.projects.find(p => p.id === state.activeProjectId);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// FILE SYSTEM ACCESS API - 파일 핸들 관리
+// ═══════════════════════════════════════════════════════════════
+const fileHandles = {
+  all: null,       // 전체 백업 파일 핸들
+  projects: {},    // 작품별 파일 핸들 { [projectId]: FileSystemFileHandle }
+};
+
+const FS_SUPPORTED = ('showSaveFilePicker' in window);
+
+async function writeToFileHandle(handle, data) {
+  try {
+    const writable = await handle.createWritable();
+    await writable.write(JSON.stringify(data, null, 2));
+    await writable.close();
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
 function saveToStorage() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.projects)); } catch(e) {}
+  // 전체 파일 핸들이 연결되어 있으면 덮어쓰기
+  if (fileHandles.all) {
+    const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
+    writeToFileHandle(fileHandles.all, data);
+  }
+  // 활성 작품 파일 핸들이 연결되어 있으면 덮어쓰기
+  if (state.activeProjectId && fileHandles.projects[state.activeProjectId]) {
+    const p = getProject();
+    if (p) writeToFileHandle(fileHandles.projects[state.activeProjectId], p);
+  }
 }
 
 function loadFromStorage() {
@@ -799,48 +831,128 @@ function loadFromStorage() {
 // ═══════════════════════════════════════════════════════════════
 // EXPORT / IMPORT
 // ═══════════════════════════════════════════════════════════════
-function exportAllProjects() {
+async function exportAllProjects() {
   if (state.projects.length === 0) { toast('저장할 작품이 없어요.'); return; }
   const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
+  if (FS_SUPPORTED) {
+    try {
+      // 이미 핸들이 있으면 바로 덮어쓰기
+      if (fileHandles.all) {
+        const ok = await writeToFileHandle(fileHandles.all, data);
+        if (ok) { toast('전체 저장 완료! ' + state.projects.length + '개 작품 💾'); return; }
+      }
+      // 처음엔 파일 선택 다이얼로그
+      const handle = await window.showSaveFilePicker({
+        suggestedName: '호필스튜디오_전체백업.json',
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+      });
+      fileHandles.all = handle;
+      await writeToFileHandle(handle, data);
+      toast('파일 연결 완료! 이후 자동으로 같은 파일에 저장됩니다 💾');
+      updateFileStatus();
+    } catch(e) {
+      if (e.name !== 'AbortError') {
+        // 폴백: 일반 다운로드
+        _downloadJson(data, '호필스튜디오_전체백업_' + new Date().toISOString().slice(0,10) + '.json');
+      }
+    }
+  } else {
+    _downloadJson(data, '호필스튜디오_전체백업_' + new Date().toISOString().slice(0,10) + '.json');
+    toast('전체 저장 완료! ' + state.projects.length + '개 작품 📦');
+  }
+}
+
+async function exportCurrentProject() {
+  const p = getProject();
+  if (!p) { toast('저장할 작품이 없어요.'); return; }
+  if (FS_SUPPORTED) {
+    try {
+      if (fileHandles.projects[p.id]) {
+        const ok = await writeToFileHandle(fileHandles.projects[p.id], p);
+        if (ok) { toast(`"${p.title||'작품'}" 저장 완료 💾`); return; }
+      }
+      const handle = await window.showSaveFilePicker({
+        suggestedName: (p.title||'작품') + '.json',
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+      });
+      fileHandles.projects[p.id] = handle;
+      await writeToFileHandle(handle, p);
+      toast(`파일 연결 완료! 이후 자동으로 같은 파일에 저장됩니다 💾`);
+      updateFileStatus();
+    } catch(e) {
+      if (e.name !== 'AbortError') {
+        _downloadJson(p, (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json');
+      }
+    }
+  } else {
+    _downloadJson(p, (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json');
+    toast(`"${p.title||'작품'}" 백업 저장 완료 📦`);
+  }
+}
+
+async function exportSingleProject(pid) {
+  const p = state.projects.find(p => p.id === pid);
+  if (!p) return;
+  if (FS_SUPPORTED) {
+    try {
+      if (fileHandles.projects[pid]) {
+        const ok = await writeToFileHandle(fileHandles.projects[pid], p);
+        if (ok) { toast(`"${p.title||'작품'}" 저장 완료 💾`); return; }
+      }
+      const handle = await window.showSaveFilePicker({
+        suggestedName: (p.title||'작품') + '.json',
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+      });
+      fileHandles.projects[pid] = handle;
+      await writeToFileHandle(handle, p);
+      toast(`"${p.title||'작품'}" 파일 연결 완료! 💾`);
+      updateFileStatus();
+    } catch(e) {
+      if (e.name !== 'AbortError') {
+        _downloadJson(p, (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json');
+      }
+    }
+  } else {
+    _downloadJson(p, (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json');
+    toast(`"${p.title||'작품'}" 저장 완료 📁`);
+  }
+}
+
+// 공통 다운로드 헬퍼 (폴백용)
+function _downloadJson(data, filename) {
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = '호필스튜디오_전체백업_' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = filename;
   a.click();
-  toast('전체 저장 완료! ' + state.projects.length + '개 작품 📦');
 }
 
-function exportData() {
+// 파일 연결 해제
+function disconnectAllFile() {
+  fileHandles.all = null;
+  updateFileStatus();
+  toast('전체 파일 연결 해제됨');
+}
+function disconnectProjectFile(pid) {
+  delete fileHandles.projects[pid];
+  updateFileStatus();
+  toast('작품 파일 연결 해제됨');
+}
+
+// 헤더 파일 상태 표시 업데이트
+function updateFileStatus() {
+  const el = document.getElementById('file-status');
+  if (!el) return;
   const p = getProject();
-  if (!p) return;
-  const blob = new Blob([JSON.stringify(p, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = (p.title || '웹소설') + '_' + new Date().toISOString().slice(0,10) + '.json';
-  a.click();
-  toast('저장 파일을 다운로드했습니다 📁');
-}
-
-function exportCurrentProject() {
-  const p = getProject();
-  if (!p) { toast('저장할 작품이 없어요.'); return; }
-  const blob = new Blob([JSON.stringify(p, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json';
-  a.click();
-  toast(`"${p.title||'작품'}" 백업 저장 완료 📦`);
-}
-
-function exportSingleProject(pid) {
-  const p = state.projects.find(p => p.id === pid);
-  if (!p) return;
-  const blob = new Blob([JSON.stringify(p, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = (p.title||'작품') + '_' + new Date().toISOString().slice(0,10) + '.json';
-  a.click();
-  toast(`"${p.title||'작품'}" 저장 완료 📁`);
+  const hasProject = p && fileHandles.projects[p.id];
+  const hasAll = !!fileHandles.all;
+  if (hasProject) {
+    el.innerHTML = `<span style="font-size:11px;color:var(--teal2);display:flex;align-items:center;gap:3px" title="파일 연결됨 — 자동저장 중">🔗 파일 연결됨</span>`;
+  } else if (hasAll) {
+    el.innerHTML = `<span style="font-size:11px;color:var(--teal2);display:flex;align-items:center;gap:3px" title="전체 파일에 자동저장 중">🔗 전체파일 연결됨</span>`;
+  } else {
+    el.innerHTML = '';
+  }
 }
 
 function importSingleProject(e) {
@@ -957,6 +1069,7 @@ function openProject(id) {
   document.getElementById('btn-load-project').style.display = 'inline-flex';
   document.getElementById('sidebar-project-title').textContent = p.title || '제목 없음';
   document.getElementById('sidebar-project-status').innerHTML = statusBadge(p.status);
+  updateFileStatus();
   navigate('overview');
 }
 
@@ -1130,8 +1243,8 @@ function renderHome() {
           <div class="project-card-footer">
             <span class="project-card-meta">${(p.chapters||[]).length}화 · ${wordCount.toLocaleString()}자</span>
             <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
-              <button class="btn btn-outline btn-sm" onclick="exportSingleProject('${p.id}')" title="이 작품만 저장">
-                📤 저장
+              <button class="btn btn-outline btn-sm" onclick="exportSingleProject('${p.id}')" title="처음엔 파일 선택, 이후 덮어쓰기 저장">
+                💾 저장
               </button>
               <button class="btn btn-danger btn-sm" onclick="deleteProjectByIndex(${_pi})">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -1149,7 +1262,7 @@ function renderHome() {
         <h1>호필 스튜디오</h1>
         <p>아이디어에서 완성작까지 — 당신의 이야기를 완성하세요</p>
         <span style="font-size:12px;color:var(--border);font-family:'Noto Serif KR',serif;letter-spacing:.5px;font-weight:400;display:block;margin-top:6px">제작자 : 호백 with Claude</span>
-        <span style="font-size:11px;color:var(--rust);opacity:.7;display:block;margin-top:8px">💾 안전한 저장을 위해 수시로 JSON 백업을 해주세요</span>
+        <span style="font-size:11px;color:var(--rust);opacity:.7;display:block;margin-top:8px">💾 저장 버튼으로 파일 연결 시 자동으로 같은 파일에 덮어쓰기 저장됩니다</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -1158,8 +1271,8 @@ function renderHome() {
 
         </div>
         <div style="display:flex;gap:10px">
-          <button class="btn btn-outline btn-sm" onclick="exportAllProjects()">
-            📦 전체 저장
+          <button class="btn btn-outline btn-sm" onclick="exportAllProjects()" title="처음엔 파일 선택, 이후 같은 파일에 덮어쓰기">
+            💾 전체 저장
           </button>
           <button class="btn btn-outline btn-sm" onclick="document.getElementById('import-file').click()">
             📂 전체 불러오기
