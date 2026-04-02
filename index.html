@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>호필 스튜디오</title>
+<script>
+window.onerror = function(msg, src, line, col, err) {
+  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;color:red;background:#fff;white-space:pre-wrap">'
+    + '🚨 오류 발생\n\n' + msg + '\n\n파일: ' + src + '\n라인: ' + line + ':' + col
+    + (err ? '\n\n' + err.stack : '') + '</div>';
+};
+window.addEventListener('unhandledrejection', function(e) {
+  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;color:red;background:#fff;white-space:pre-wrap">'
+    + '🚨 Promise 오류\n\n' + (e.reason?.stack || e.reason) + '</div>';
+});
+</script>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#18120a">
 <meta name="mobile-web-app-capable" content="yes">
@@ -8512,24 +8523,4 @@ function saveFamily(idx) {
   autoSave(); closeModal();
   refreshSplitPanel();
   if (!document.getElementById('focus-overlay')?.classList.contains('active')) renderFamily();
-  toast(idx!==undefined?'수정했습니다.':'가문을 추가했습니다!');
-}
-
-function deleteFamily(idx) {
-  confirmDialog('이 가문 및 집단을 삭제합니다.', () => {
-    getProject().families.splice(idx,1);
-    autoSave(); renderFamily();
-    toast('가문 및 집단을 삭제했어요.');
-  });
-}
-
-function showAddMemberModal(fi) {
-  const p = getProject();
-  const f = p.families[fi];
-  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
-  const chars = p.characters || [];
-  showModal(`
-    <div class="modal-title">${tab} 구성원 추가</div>
-    ${chars.length > 0 ? `
-    <div style="margin-bottom:14px;padding:10px 12px;background:var(--cream);border-radius:8px;border:1px solid var(--border)">
-      <di
+  toast(idx!==undefined?'수정했습니다.':'가문을
