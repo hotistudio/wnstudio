@@ -5614,7 +5614,8 @@ document.addEventListener('keydown', e => {
     if (overlay && overlay.classList.contains('active')) {
       e.preventDefault();
       saveToStorage();
-      fsSaveToLocal().then(result => {
+      const p = getProject();
+      fsSaveToLocal(p || null).then(result => {
         if (result === true) showSavedBanner(true);
         else if (result === false) showSavedBanner(false);
       });
@@ -6103,6 +6104,14 @@ function closeModal() {
     renderDiagramCanvas();
   }
 }
+// Ctrl+S 브라우저 기본 동작 완전 차단 (캡처 단계)
+window.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, true);
+
 document.addEventListener('keydown', e => {
   // ESC → 모달 닫기
   if (e.key === 'Escape') { closeModal(); return; }
@@ -6114,7 +6123,7 @@ document.addEventListener('keydown', e => {
     if (p) {
       saveToStorage();
       setLastBackupTime();
-      fsSaveToLocal().then(result => {
+      fsSaveToLocal(p).then(result => {
         if (result === true) {
           showSavedBanner(true);
           const titleBtn = document.getElementById('header-title');
@@ -6371,12 +6380,11 @@ function changeFontSize(delta) {
 let _fsFileHandle = null;
 
 // Ctrl+S 시 호출 — 처음 한 번만 파일 선택, 이후엔 덮어쓰기
-async function fsSaveToLocal() {
-  // 작품 내에서는 해당 작품만, 홈에서는 전체 저장
-  const p = getProject();
-  const data = p ? p : { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
+async function fsSaveToLocal(projectData) {
+  // projectData가 있으면 작품 단독 저장, 없으면 전체 저장
+  const data = projectData || { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
   const json = JSON.stringify(data, null, 2);
-  const suggestedName = p ? (p.title || '호필스튜디오') + '.json' : '호필스튜디오_전체.json';
+  const suggestedName = projectData ? (projectData.title || '호필스튜디오') + '.json' : '호필스튜디오_전체.json';
 
   if (FS_SUPPORTED) {
     try {
