@@ -8152,9 +8152,17 @@ document.addEventListener('visibilitychange', () => {
       <span style="font-size:15px">🍅</span>
       <span id="pomo-mode-label" style="font-size:12px;font-weight:700;letter-spacing:.5px">집필 중</span>
     </div>
-    <button onclick="closePomodoro()" style="background:none;border:none;cursor:pointer;
-      color:rgba(255,255,255,.5);font-size:16px;line-height:1;padding:0">×</button>
+    <div style="display:flex;align-items:center;gap:4px">
+      <button onclick="pomoCollapse()" id="pomo-collapse-btn" title="접기"
+        style="background:none;border:none;cursor:pointer;
+        color:rgba(255,255,255,.5);font-size:13px;line-height:1;padding:0 4px">▾</button>
+      <button onclick="closePomodoro()" style="background:none;border:none;cursor:pointer;
+        color:rgba(255,255,255,.5);font-size:16px;line-height:1;padding:0">×</button>
+    </div>
   </div>
+
+  <!-- 접히는 본문 -->
+  <div id="pomo-body">
 
   <!-- 타이머 -->
   <div style="text-align:center;padding:14px 0 10px">
@@ -8202,6 +8210,8 @@ document.addEventListener('visibilitychange', () => {
   <div id="pomo-toast" style="display:none;padding:8px 14px;
     background:var(--teal);font-size:12px;font-weight:600;text-align:center;
     border-top:1px solid rgba(255,255,255,.1)"></div>
+
+  </div><!-- /pomo-body -->
 </div>
 
 <script>
@@ -8223,6 +8233,15 @@ let pomoState = {
   startChars: 0,
   timer: null,
 };
+
+function pomoCollapse() {
+  const body = document.getElementById('pomo-body');
+  const btn = document.getElementById('pomo-collapse-btn');
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  btn.textContent = collapsed ? '▾' : '▴';
+  btn.title = collapsed ? '접기' : '펼치기';
+}
 
 function togglePomodoro() {
   const w = document.getElementById('pomo-widget');
@@ -8266,6 +8285,26 @@ function pomoTick() {
   pomoUpdateDisplay();
 }
 
+function pomoPlaySound(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = type === 'work'
+      ? [{ f: 880, t: 0, d: 0.3 }, { f: 1100, t: 0.2, d: 0.3 }, { f: 1320, t: 0.4, d: 0.5 }]  // 집필 완료 - 경쾌하게 올라가는 3음
+      : [{ f: 660, t: 0, d: 0.4 }, { f: 550, t: 0.3, d: 0.6 }];  // 휴식 끝 - 부드럽게 내려가는 2음
+    notes.forEach(({ f, t, d }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, ctx.currentTime + t);
+      gain.gain.setValueAtTime(0.4, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + d);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + d);
+    });
+  } catch(e) {}
+}
+
 function pomoComplete() {
   clearInterval(pomoState.timer);
   pomoState.running = false;
@@ -8273,6 +8312,9 @@ function pomoComplete() {
 
   // 진동
   navigator.vibrate?.([200, 100, 200]);
+
+  // 소리
+  pomoPlaySound(pomoState.mode);
 
   if (pomoState.mode === 'work') {
     // 쓴 글자 수 계산
