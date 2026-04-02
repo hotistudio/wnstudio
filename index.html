@@ -787,7 +787,7 @@ async function writeToFileHandle(handle, data) {
     for (const pid in fileHandles.projects) {
       if (fileHandles.projects[pid] === handle) delete fileHandles.projects[pid];
     }
-    _fsFileHandle = null;
+    
     return false;
   }
 }
@@ -1035,7 +1035,7 @@ function importData(e) {
         const existing = state.projects.length;
         const doImport = () => {
           state.projects = cleaned.map(p => ({ ...p, id: p.id || uid() }));
-          fileHandles.all = null; fileHandles.projects = {}; _fsFileHandle = null;
+          fileHandles.all = null; fileHandles.projects = {};
           saveToStorage();
           renderHome();
           toast('불러오기 완료! ' + cleaned.length + '개 작품 📖');
@@ -1055,7 +1055,7 @@ function importData(e) {
       const exists = state.projects.findIndex(p => p.id === data.id);
       if (exists >= 0) state.projects[exists] = data;
       else state.projects.push(data);
-      fileHandles.all = null; fileHandles.projects = {}; _fsFileHandle = null;
+      fileHandles.all = null; fileHandles.projects = {};
       saveToStorage();
       toast('불러오기 완료! 📖');
       renderHome();
@@ -1096,7 +1096,6 @@ function openProject(id) {
   document.getElementById('sidebar-project-title').textContent = p.title || '제목 없음';
   document.getElementById('sidebar-project-status').innerHTML = statusBadge(p.status);
   updateFileStatus();
-  _fsFileHandle = null;
   navigate('overview');
 }
 
@@ -6373,40 +6372,46 @@ function changeFontSize(delta) {
 // ═══════════════════════════════════════════════════════════
 // 로컬 파일 저장 (File System Access API)
 // ═══════════════════════════════════════════════════════════
-let _fsFileHandle = null;
 
-// Ctrl+S 시 호출 — 처음 한 번만 파일 선택, 이후엔 덮어쓰기
+// Ctrl+S 시 호출 — fileHandles 시스템 사용
 async function fsSaveToLocal(projectData) {
-  // projectData가 있으면 작품 단독 저장, 없으면 전체 저장
-  const data = projectData || { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
-  const json = JSON.stringify(data, null, 2);
-  const suggestedName = projectData ? (projectData.title || '호필스튜디오') + '.json' : '호필스튜디오_전체.json';
+  const isProject = !!projectData;
+  const data = isProject ? projectData : { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
+  const suggestedName = isProject ? (projectData.title || '호필스튜디오') + '.json' : '호필스튜디오_전체.json';
 
   if (FS_SUPPORTED) {
     try {
-      if (!_fsFileHandle) {
-        _fsFileHandle = await window.showSaveFilePicker({
-          suggestedName,
-          types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
-        });
+      // 기존 핸들 확인
+      const existingHandle = isProject
+        ? fileHandles.projects[projectData.id]
+        : fileHandles.all;
+
+      if (existingHandle) {
+        const ok = await writeToFileHandle(existingHandle, data);
+        if (ok) return true;
+        // 핸들 깨진 경우 → 새로 선택
       }
-      const writable = await _fsFileHandle.createWritable();
-      await writable.write(json);
-      await writable.close();
+
+      // 파일 선택 다이얼로그
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+      });
+
+      if (isProject) fileHandles.projects[projectData.id] = handle;
+      else fileHandles.all = handle;
+
+      await writeToFileHandle(handle, data);
+      updateFileStatus();
       return true;
     } catch(e) {
       if (e.name === 'AbortError') return null;
-      _fsFileHandle = null;
       return false;
     }
   } else {
     // 미지원 브라우저 — 다운로드 폴백
     try {
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'hopil-studio.json'; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      _downloadJson(data, suggestedName);
       return true;
     } catch { return false; }
   }
