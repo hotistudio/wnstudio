@@ -783,6 +783,11 @@ async function writeToFileHandle(handle, data) {
     await writable.close();
     return true;
   } catch(e) {
+    if (fileHandles.all === handle) { fileHandles.all = null; updateFileStatus(); }
+    for (const pid in fileHandles.projects) {
+      if (fileHandles.projects[pid] === handle) delete fileHandles.projects[pid];
+    }
+    _fsFileHandle = null;
     return false;
   }
 }
@@ -1014,6 +1019,8 @@ function importData(e) {
         const existing = state.projects.length;
         const doImport = () => {
           state.projects = cleaned.map(p => ({ ...p, id: p.id || uid() }));
+          // 파일 핸들 초기화 (삭제된 파일 핸들 정리)
+          fileHandles.all = null; fileHandles.projects = {}; _fsFileHandle = null;
           saveToStorage();
           renderHome();
           toast('불러오기 완료! ' + cleaned.length + '개 작품' + (removed > 0 ? ' (빈 작품 ' + removed + '개 제외)' : '') + ' 📖');
@@ -1033,6 +1040,7 @@ function importData(e) {
       const exists = state.projects.findIndex(p => p.id === data.id);
       if (exists >= 0) state.projects[exists] = data;
       else state.projects.push(data);
+      fileHandles.all = null; fileHandles.projects = {}; _fsFileHandle = null;
       saveToStorage();
       toast('불러오기 완료! 📖');
       renderHome();
