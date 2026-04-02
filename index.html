@@ -970,6 +970,32 @@ function importSingleProject(e) {
   reader.onload = ev => {
     try {
       const data = JSON.parse(ev.target.result);
+
+      // 전체 백업 포맷 ({projects:[...]}) 인 경우 처리
+      if (data.projects && Array.isArray(data.projects)) {
+        if (data.projects.length === 0) { toast('파일에 작품이 없어요.'); return; }
+        if (data.projects.length === 1) {
+          // 작품이 1개면 바로 가져오기
+          const proj = { ...data.projects[0], id: data.projects[0].id || uid() };
+          const idx = state.projects.findIndex(p => p.id === proj.id);
+          if (idx !== -1) {
+            confirmDialog(`"${proj.title||'작품'}"이 이미 있어요. 덮어쓸까요?`, () => {
+              state.projects[idx] = proj;
+              saveToStorage(); renderHome();
+              toast(`"${proj.title||'작품'}" 불러오기 완료 📖`);
+            });
+          } else {
+            state.projects.push(proj);
+            saveToStorage(); renderHome();
+            toast(`"${proj.title||'작품'}" 불러오기 완료 📖`);
+          }
+        } else {
+          // 작품이 여럿이면 전체 불러오기로 안내
+          toast(`이 파일엔 ${data.projects.length}개 작품이 있어요. "전체 불러오기"를 사용해주세요.`);
+        }
+        e.target.value = ''; return;
+      }
+
       // 단일 작품 형식인지 확인
       if (!data.id && !data.title && !data.chapters) {
         toast('올바른 작품 파일이 아니에요.'); return;
