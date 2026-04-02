@@ -6936,6 +6936,96 @@ function setWritingGoal(n) {
   localStorage.setItem('wnstudio_goal', String(n));
 }
 
+// ═══════════════════════════════════════════════════════════
+// 타이핑 시간 감지
+// ═══════════════════════════════════════════════════════════
+const TYPING_IDLE_KEY = 'wnstudio_typing_gap';
+function getTypingGap() {
+  return parseInt(localStorage.getItem(TYPING_IDLE_KEY) || '5');
+}
+function setTypingGap(n) {
+  localStorage.setItem(TYPING_IDLE_KEY, String(Math.max(1, Math.min(30, n))));
+}
+const TYPING_STATS_KEY = 'wnstudio_typing_stats';
+function loadTypingStats() {
+  try { return JSON.parse(localStorage.getItem(TYPING_STATS_KEY) || '{}'); } catch { return {}; }
+}
+function saveTypingStats(s) {
+  try { localStorage.setItem(TYPING_STATS_KEY, JSON.stringify(s)); } catch {}
+}
+function recordTypingSec(sec) {
+  const pid = state.activeProjectId;
+  if (!pid) return;
+  const today = getTodayStr();
+  const s = loadTypingStats();
+  if (!s[pid]) s[pid] = {};
+  s[pid][today] = (s[pid][today] || 0) + sec;
+  saveTypingStats(s);
+}
+function getTodayTypingSec() {
+  const pid = state.activeProjectId;
+  if (!pid) return 0;
+  const s = loadTypingStats();
+  return (s[pid] || {})[getTodayStr()] || 0;
+}
+function getWeekTypingSec() {
+  const pid = state.activeProjectId;
+  if (!pid) return 0;
+  const s = (loadTypingStats()[pid] || {});
+  let total = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    total += s[d.toISOString().slice(0,10)] || 0;
+  }
+  return total;
+}
+function getMonthTypingSec() {
+  const pid = state.activeProjectId;
+  if (!pid) return 0;
+  const s = (loadTypingStats()[pid] || {});
+  let total = 0;
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    total += s[d.toISOString().slice(0,10)] || 0;
+  }
+  return total;
+}
+let _typingState = { active:false, idleTimer:null, sessionSec:0, ticker:null };
+function typingFmt(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m + '분 ' + s + '초';
+}
+function onTypingKey() {
+  if (!_typingState.active) {
+    _typingState.active = true;
+    _typingState.ticker = setInterval(() => {
+      _typingState.sessionSec++;
+      pomoState.sessionTypingSec++;
+      recordTypingSec(1);
+      updateTypingDisplay();
+    }, 1000);
+  }
+  clearTimeout(_typingState.idleTimer);
+  _typingState.idleTimer = setTimeout(() => {
+    _typingState.active = false;
+    clearInterval(_typingState.ticker);
+    _typingState.ticker = null;
+  }, getTypingGap() * 1000);
+}
+function updateTypingDisplay() {
+  const el = document.getElementById('pomo-typing-time');
+  if (el) el.textContent = typingFmt(pomoState.sessionTypingSec);
+  const todayEl = document.getElementById('stat-typing-today');
+  if (todayEl) todayEl.textContent = typingFmt(getTodayTypingSec());
+}
+function resetSessionTyping() {
+  _typingState.sessionSec = 0;
+  pomoState.sessionTypingSec = 0;
+  const el = document.getElementById('pomo-typing-time');
+  if (el) el.textContent = '0분 0초';
+}
+
 function renderStats() {
   const p = getProject();
   if (!p) return;
@@ -8470,57 +8560,4 @@ function showFamilyModal(idx) {
       <label class="label">유형</label>
       <select id="fm-type" onchange="updateFmSubs(this.value,'')" style="width:100%;margin-bottom:6px">
         ${FM_TYPES_MODAL.map(t=>`<option value="${t.id}" ${curType===t.id?'selected':''}>${t.label}</option>`).join('')}
-      </select>
-      <select id="fm-sub" style="width:100%">
-        ${curTypeSubs.map(s=>`<option value="${s}" ${curSub===s?'selected':''}>${s}</option>`).join('')}
-      </select>
-    </div>
-    <div style="margin-bottom:12px"><label class="label">상위 가문/집단 (선택)</label>
-      <select id="fm-parent">
-        <option value="">없음 (독립)</option>
-        ${(p.families||[]).filter((pf,i) => i !== idx && pf.name !== f.name).map(pf=>`<option value="${esc(pf.name)}" ${(f.parentName===pf.name)?'selected':''}>${esc(pf.name)}</option>`).join('')}
-      </select></div>
-    <div style="margin-bottom:12px"><label class="label">등급/직위</label>
-      <input id="fm-rank" value="${esc(f.rank||'')}" placeholder="예: 공작가, 1등급, 최상위"></div>
-    <div style="margin-bottom:14px"><label class="label">설명</label>
-      <textarea id="fm-desc" rows="3" placeholder="역사, 특징, 가훈, 목표 등">${esc(f.description||'')}</textarea></div>
-    <div style="margin-bottom:20px">
-      <label class="label">색상</label>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px" id="fm-color-group">
-        ${FAMILY_COLORS.map((c,i)=>`
-          <button type="button" onclick="selectEdgeOpt('fm-color-group',this,'${c}')"
-            data-val="${c}" ${(f.color||FAMILY_COLORS[0])===c?'data-selected="1"':''}
-            style="width:32px;height:32px;border-radius:50%;background:${c};cursor:pointer;
-              border:3px solid ${(f.color||FAMILY_COLORS[0])===c?'var(--ink)':'transparent'};
-              transition:all .15s"></button>`).join('')}
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal()">취소</button>
-      <button class="btn btn-gold" onclick="saveFamily(${idx})">저장</button>
-    </div>`, false);
-  setTimeout(()=>document.getElementById('fm-name')?.focus(),100);
-}
-
-function saveFamily(idx) {
-  const name = document.getElementById('fm-name').value.trim();
-  if (!name) { toast('가문 이름을 입력해주세요.'); return; }
-  const p = getProject();
-  if (!p.families) p.families = [];
-  const f = {
-    id: idx!==undefined ? p.families[idx].id : uid(),
-    name,
-    parentName: document.getElementById('fm-parent')?.value || '',
-    groupType: document.getElementById('fm-type')?.value || 'family',
-    groupSub: document.getElementById('fm-sub')?.value || '',
-    rank: document.getElementById('fm-rank').value,
-    description: document.getElementById('fm-desc').value,
-    color: document.querySelector('#fm-color-group [data-selected]')?.dataset?.val || '#c4922a',
-    members: idx!==undefined ? p.families[idx].members||[] : [],
-    groups: idx!==undefined ? p.families[idx].groups||{} : {},
-  };
-  if (idx!==undefined) p.families[idx]=f; else p.families.push(f);
-  autoSave(); closeModal();
-  refreshSplitPanel();
-  if (!document.getElementById('focus-overlay')?.classList.contains('active')) renderFamily();
-  toast(idx!==undefined?'수정했습니다.':'가문을
+    
