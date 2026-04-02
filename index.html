@@ -6372,11 +6372,10 @@ let _fsFileHandle = null;
 
 // Ctrl+S 시 호출 — 처음 한 번만 파일 선택, 이후엔 덮어쓰기
 async function fsSaveToLocal() {
-  const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
-  const json = JSON.stringify(data, null, 2);
-
-  // 작품 내에서는 작품 제목을 파일명으로
+  // 작품 내에서는 해당 작품만, 홈에서는 전체 저장
   const p = getProject();
+  const data = p ? p : { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
+  const json = JSON.stringify(data, null, 2);
   const suggestedName = p ? (p.title || '호필스튜디오') + '.json' : '호필스튜디오_전체.json';
 
   if (FS_SUPPORTED) {
