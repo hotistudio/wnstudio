@@ -2431,6 +2431,7 @@ function renderEditorContent(ch) {
             <span id="font-size-display" style="font-size:11px;color:var(--muted);min-width:28px;text-align:center;font-weight:600">16px</span>
             <button onclick="changeFontSize(1)" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--muted);padding:2px 3px;font-weight:700">＋</button>
           </div>
+          <button class="btn btn-outline btn-sm" onclick="toggleTypewriterMode()" id="typewriter-mode-btn" title="타자기 모드 - 현재 줄이 항상 화면 중앙에" style="font-size:13px">📜 타자기</button>
           <button class="btn btn-outline btn-sm" onclick="togglePomodoro()" id="pomo-toolbar-btn" title="뽀모도로 타이머" style="font-size:13px">🍅 집필</button>
           <button class="btn btn-outline btn-sm" onclick="enterFocusMode()" title="집중 모드" style="font-size:13px">⛶ 집중</button>
           <button class="btn btn-outline btn-sm" id="sym-toggle-btn" onclick="toggleSymbolPalette()" style="font-size:13px">✦ 기호</button>
@@ -2516,6 +2517,7 @@ function renderEditorContent(ch) {
         </div>
       </div>
     </div>`;
+  setTimeout(initTypewriterMode, 0);
 }
 
 function toggleChapterMemo() {
@@ -2548,6 +2550,11 @@ function onEditorInput(id, val) {
   // 날짜별 집필량 기록
   const diff = val.length - prevLen;
   if (diff > 0) recordDailyWriting(diff);
+  // 타자기 모드 스크롤
+  if (getTypewriterMode()) {
+    const ta = document.getElementById('prose-editor');
+    if (ta) typewriterScroll(ta);
+  }
   // debounce save
   clearTimeout(window._saveTimer);
   window._saveTimer = setTimeout(() => { autoSave(); updateChapterListItem(ch); }, 800);
@@ -4948,6 +4955,81 @@ function confirmDialog(msg, onOk) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// 타자기 모드 (현재 줄이 항상 화면 세로 중앙에)
+// ═══════════════════════════════════════════════════════════
+function getTypewriterMode() {
+  return localStorage.getItem('wnstudio_typewriter') === '1';
+}
+function toggleTypewriterMode() {
+  const on = !getTypewriterMode();
+  localStorage.setItem('wnstudio_typewriter', on ? '1' : '0');
+  applyTypewriterMode();
+  if (on) toast('타자기 모드 켜짐 📜 현재 줄이 화면 중앙에 고정돼요');
+  else toast('타자기 모드 꺼짐');
+}
+function applyTypewriterMode() {
+  const on = getTypewriterMode();
+  const btn = document.getElementById('typewriter-mode-btn');
+  if (btn) {
+    btn.style.color = on ? 'var(--teal)' : '';
+    btn.style.borderColor = on ? 'var(--teal)' : '';
+    btn.textContent = on ? '📜 타자기 ON' : '📜 타자기';
+  }
+  const ta = document.getElementById('prose-editor');
+  if (ta) {
+    if (on) typewriterScroll(ta);
+    else {
+      // 패딩 원복
+      ta.closest('.editor-content').style.paddingTop = '';
+      ta.closest('.editor-content').style.paddingBottom = '';
+    }
+  }
+}
+
+function typewriterScroll(ta) {
+  if (!getTypewriterMode()) return;
+  const ec = ta.closest('.editor-content');
+  if (!ec) return;
+
+  // 커서 위치까지의 텍스트로 현재 줄 Y 좌표 계산
+  const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 32;
+  const text = ta.value.substring(0, ta.selectionStart);
+  const lines = text.split('\n').length;
+  const cursorY = (lines - 1) * lineHeight;
+
+  // 편집기 영역 높이의 절반만큼 패딩 추가해서 커서가 중앙에 오도록
+  const halfH = ec.clientHeight / 2;
+  ec.style.paddingTop = halfH + 'px';
+  ec.style.paddingBottom = halfH + 'px';
+
+  // 커서가 있는 줄이 화면 중앙에 오도록 스크롤
+  const scrollTarget = cursorY - halfH + lineHeight / 2;
+  ec.scrollTop = Math.max(0, scrollTarget);
+}
+
+// renderChapters 이후 상태 복원용
+function initTypewriterMode() {
+  applyTypewriterMode();
+  const ta = document.getElementById('prose-editor');
+  if (ta && getTypewriterMode()) typewriterScroll(ta);
+}
+
+// 커서 이동(방향키, 클릭)에도 반응
+document.addEventListener('keyup', e => {
+  if (!getTypewriterMode()) return;
+  const ta = document.getElementById('prose-editor');
+  if (document.activeElement === ta && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','PageUp','PageDown'].includes(e.key)) {
+    typewriterScroll(ta);
+  }
+});
+document.addEventListener('click', e => {
+  if (!getTypewriterMode()) return;
+  const ta = document.getElementById('prose-editor');
+  if (e.target === ta) setTimeout(() => typewriterScroll(ta), 0);
+});
+
+// ═══════════════════════════════════════════════════════════
 // 분할 패널 (참고 패널)
 // ═══════════════════════════════════════════════════════════
 let splitTab = 'overview';
@@ -6883,6 +6965,37 @@ function renderStats() {
         </div>
       </div>
 
+      <!-- 타이핑 시간 카드 -->
+      <div class="card card-sm" style="margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span style="font-weight:700;font-size:13px">⌨️ 순수 타이핑 시간</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;color:var(--muted)">유휴 간격</span>
+            <input type="number" id="typing-gap-input" value="${getTypingGap()}" min="1" max="30" step="1"
+              style="width:52px;text-align:center;font-size:13px;padding:4px 6px"
+              onchange="setTypingGap(parseInt(this.value)||5)">
+            <span style="font-size:11px;color:var(--muted)">초</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div style="text-align:center;flex:1">
+            <div class="font-display" style="font-size:26px;color:var(--teal)" id="stat-typing-today">${typingFmt(getTodayTypingSec())}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">오늘</div>
+          </div>
+          <div style="text-align:center;flex:1">
+            <div class="font-display" style="font-size:26px;color:var(--muted)">${typingFmt(getWeekTypingSec())}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">최근 7일</div>
+          </div>
+          <div style="text-align:center;flex:1">
+            <div class="font-display" style="font-size:26px;color:var(--muted)">${typingFmt(getMonthTypingSec())}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">최근 30일</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+          💡 키를 입력하다 <b>${getTypingGap()}초</b> 이상 멈추면 타이핑이 끊긴 것으로 간주해요
+        </div>
+      </div>
+
       <div class="card card-sm" style="margin-bottom:20px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <span style="font-weight:700;font-size:13px">오늘 목표</span>
@@ -8761,6 +8874,13 @@ document.addEventListener('visibilitychange', () => {
     </div>
   </div>
 
+  <!-- 타이핑 시간 -->
+  <div style="padding:7px 14px;border-top:1px solid rgba(255,255,255,.08);
+    display:flex;align-items:center;justify-content:space-between">
+    <span style="font-size:10px;color:rgba(255,255,255,.4)">⌨️ 순수 타이핑</span>
+    <span id="pomo-typing-time" style="font-size:11px;font-weight:700;color:rgba(255,255,255,.7)">0분 0초</span>
+  </div>
+
   <!-- 세션 종료 메시지 -->
   <div id="pomo-toast" style="display:none;padding:8px 14px;
     background:var(--teal);font-size:12px;font-weight:600;text-align:center;
@@ -8779,7 +8899,7 @@ const POMO_LONG = 15 * 60;
 
 let pomoState = {
   running: false,
-  mode: 'work',       // 'work' | 'short' | 'long'
+  mode: 'work',
   remaining: POMO_WORK,
   total: POMO_WORK,
   session: 1,
@@ -8787,7 +8907,124 @@ let pomoState = {
   completedWork: 0,
   startChars: 0,
   timer: null,
+  sessionTypingSec: 0,  // 현재 세션 타이핑 초
 };
+
+// ═══════════════════════════════════════════════════════════
+// 타이핑 시간 감지
+// ═══════════════════════════════════════════════════════════
+const TYPING_IDLE_KEY = 'wnstudio_typing_gap';
+function getTypingGap() {
+  return parseInt(localStorage.getItem(TYPING_IDLE_KEY) || '5');
+}
+function setTypingGap(n) {
+  localStorage.setItem(TYPING_IDLE_KEY, String(Math.max(1, Math.min(30, n))));
+}
+
+const TYPING_STATS_KEY = 'wnstudio_typing_stats';
+function loadTypingStats() {
+  try { return JSON.parse(localStorage.getItem(TYPING_STATS_KEY) || '{}'); } catch { return {}; }
+}
+function saveTypingStats(s) {
+  try { localStorage.setItem(TYPING_STATS_KEY, JSON.stringify(s)); } catch {}
+}
+function recordTypingSec(sec) {
+  const pid = state.activeProjectId;
+  if (!pid) return;
+  const today = getTodayStr();
+  const s = loadTypingStats();
+  if (!s[pid]) s[pid] = {};
+  s[pid][today] = (s[pid][today] || 0) + sec;
+  saveTypingStats(s);
+}
+function getTodayTypingSec() {
+  const pid = state.activeProjectId;
+  if (!pid) return 0;
+  const s = loadTypingStats();
+  return (s[pid] || {})[getTodayStr()] || 0;
+}
+function getWeekTypingSec() {
+  const pid = state.activeProjectId;
+  if (!pid) return 0;
+  const s = (loadTypingStats()[pid] || {});
+  let total = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    total += s[d.toISOString().slice(0,10)] || 0;
+  }
+  return total;
+}
+function getMonthTypingSec() {
+  const pid = state.activeProjectId;
+  if (!pid) return 0;
+  const s = (loadTypingStats()[pid] || {});
+  let total = 0;
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    total += s[d.toISOString().slice(0,10)] || 0;
+  }
+  return total;
+}
+
+// 타이핑 감지 상태
+let _typingState = {
+  active: false,       // 현재 타이핑 중인지
+  idleTimer: null,     // 유휴 타이머
+  sessionSec: 0,       // 현재 세션 타이핑 초
+  ticker: null,        // 1초 카운터
+};
+
+function typingFmt(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m + '분 ' + s + '초';
+}
+
+function onTypingKey() {
+  if (!_typingState.active) {
+    // 타이핑 시작
+    _typingState.active = true;
+    _typingState.ticker = setInterval(() => {
+      _typingState.sessionSec++;
+      pomoState.sessionTypingSec++;
+      recordTypingSec(1);
+      updateTypingDisplay();
+    }, 1000);
+  }
+  // 유휴 타이머 리셋
+  clearTimeout(_typingState.idleTimer);
+  _typingState.idleTimer = setTimeout(() => {
+    // 타이핑 멈춤
+    _typingState.active = false;
+    clearInterval(_typingState.ticker);
+    _typingState.ticker = null;
+  }, getTypingGap() * 1000);
+}
+
+function updateTypingDisplay() {
+  // 뽀모도로 위젯
+  const el = document.getElementById('pomo-typing-time');
+  if (el) el.textContent = typingFmt(pomoState.sessionTypingSec);
+  // 통계 탭 실시간 업데이트
+  const todayEl = document.getElementById('stat-typing-today');
+  if (todayEl) todayEl.textContent = typingFmt(getTodayTypingSec());
+}
+
+function resetSessionTyping() {
+  _typingState.sessionSec = 0;
+  pomoState.sessionTypingSec = 0;
+  const el = document.getElementById('pomo-typing-time');
+  if (el) el.textContent = '0분 0초';
+}
+
+// 편집기에 타이핑 감지 이벤트 연결
+document.addEventListener('keydown', e => {
+  const ta = document.getElementById('prose-editor');
+  const fe = document.getElementById('focus-editor');
+  if (document.activeElement === ta || document.activeElement === fe) {
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) onTypingKey();
+  }
+});
 
 function pomoCollapse() {
   const body = document.getElementById('pomo-body');
@@ -8824,6 +9061,7 @@ function pomoToggle() {
     if (pomoState.mode === 'work' && pomoState.remaining === POMO_WORK) {
       const editor = document.getElementById('prose-editor') || document.getElementById('focus-editor');
       pomoState.startChars = editor ? editor.value.length : 0;
+      resetSessionTyping();
     }
     pomoState.running = true;
     document.getElementById('pomo-playpause').textContent = 'II';
