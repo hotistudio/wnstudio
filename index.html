@@ -6110,16 +6110,6 @@ window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     e.preventDefault();
     e.stopPropagation();
-  }
-}, true);
-
-document.addEventListener('keydown', e => {
-  // ESC → 모달 닫기
-  if (e.key === 'Escape') { closeModal(); return; }
-
-  // Ctrl+S → 로컬 파일 저장
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    e.preventDefault();
     const p = getProject();
     if (p) {
       saveToStorage();
@@ -6127,7 +6117,7 @@ document.addEventListener('keydown', e => {
       fsSaveToLocal(p).then(result => {
         if (result === true) {
           showSavedBanner(true);
-          toast(`"${p.title||'작품'}" 저장 완료 💾`);
+          toast((p.title || '작품') + ' 저장 완료 💾');
           const titleBtn = document.getElementById('header-title');
           if (titleBtn) {
             const orig = titleBtn.innerHTML;
@@ -6139,13 +6129,16 @@ document.addEventListener('keydown', e => {
           showSavedBanner(false);
           toast('⚠️ 저장 실패. 다시 시도해주세요.');
         }
-        // null = 사용자 취소, 아무것도 안 함
       });
     } else {
       toast('저장할 작품을 먼저 열어주세요.');
     }
-    return;
   }
+}, true);
+
+document.addEventListener('keydown', e => {
+  // ESC → 모달 닫기
+  if (e.key === 'Escape') { closeModal(); return; }
 
   // Ctrl+1~0 → 특수기호 삽입 (집필 편집기 + 집중 모드)
   if ((e.ctrlKey || e.metaKey) && SHORTCUT_SYMBOLS[e.key]) {
