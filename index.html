@@ -1073,6 +1073,7 @@ function openProject(id) {
   document.getElementById('sidebar-project-title').textContent = p.title || '제목 없음';
   document.getElementById('sidebar-project-status').innerHTML = statusBadge(p.status);
   updateFileStatus();
+  _fsFileHandle = null;
   navigate('overview');
 }
 
@@ -6351,11 +6352,15 @@ async function fsSaveToLocal() {
   const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
   const json = JSON.stringify(data, null, 2);
 
+  // 작품 내에서는 작품 제목을 파일명으로
+  const p = getProject();
+  const suggestedName = p ? (p.title || '호필스튜디오') + '.json' : '호필스튜디오_전체.json';
+
   if (FS_SUPPORTED) {
     try {
       if (!_fsFileHandle) {
         _fsFileHandle = await window.showSaveFilePicker({
-          suggestedName: 'hopil-studio.json',
+          suggestedName,
           types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
         });
       }
