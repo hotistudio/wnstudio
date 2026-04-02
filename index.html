@@ -918,6 +918,9 @@ async function exportSingleProject(pid) {
   }
 }
 
+// exportData = exportCurrentProject 별칭 (하위 호환)
+function exportData() { exportCurrentProject(); }
+
 // 공통 다운로드 헬퍼 (폴백용)
 function _downloadJson(data, filename) {
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
@@ -6342,7 +6345,6 @@ function changeFontSize(delta) {
 // 로컬 파일 저장 (File System Access API)
 // ═══════════════════════════════════════════════════════════
 let _fsFileHandle = null;
-const FS_SUPPORTED = ('showSaveFilePicker' in window);
 
 // Ctrl+S 시 호출 — 처음 한 번만 파일 선택, 이후엔 덮어쓰기
 async function fsSaveToLocal() {
