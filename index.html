@@ -12,11 +12,6 @@ window.onerror = function(msg, src, line, col, err) {
 };
 window.addEventListener('unhandledrejection', function(e) {
   var msg = e.reason ? (e.reason.stack || String(e.reason)) : String(e);
-  // SW/PWA 관련 무해한 오류 무시
-  if (msg.indexOf('SecurityError') !== -1) return;
-  if (msg.indexOf('ServiceWorker') !== -1) return;
-  if (msg.indexOf('getRegistration') !== -1) return;
-  if (msg.indexOf('null origin') !== -1) return;
   document.body.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;color:red;background:#fff;white-space:pre-wrap;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;overflow:auto">'
     + '🚨 Promise 오류\n\n' + msg + '</div>';
 });
@@ -8555,4 +8550,4 @@ function renderFamily() {
             ${isChild?`<span style="font-size:12px;color:${f.color||'var(--gold)'};font-weight:700">└</span>`:''}
             <span style="font-size:11px;color:var(--muted);transition:transform .2s;display:inline-block;transform:rotate(${collapsed?'-90':'0'}deg)">▾</span>
             <span class="font-display" style="font-size:${isChild?'15':'17'}px">${esc(f.name)}</span>
-            <span class="tag" style="background:var(--teal-light);color:var(--teal);border-color:var(--teal)">${({'family':'가문','guild':'길드','knight':'기사단','crime_f
+            <span class="tag" style="background:var(--teal-light);color:var(--teal);border-color:var(--teal)">${({'family':'가문','guild':'길드','knight':'기사단','crime_f':'범죄조직','religion':'종교','academic':'학술','politics':'정치','corp':'기업','school':'학교','crime_m':'범죄조직','media':'미디어','military':'군사','politics_m':'정치','korean':'한국풍','chinese':'중국풍','japanese':'일본풍','other':'기타'}[f.groupType||'famil
