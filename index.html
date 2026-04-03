@@ -1593,17 +1593,13 @@ function renderCharacters() {
   const orderedKeys = [...ROLES.filter(r => groups[r]), ...Object.keys(groups).filter(r => !ROLES.includes(r))];
 
   const renderCard = ({c, i}) => {
-    const isFirst = i === 0;
-    const isLast = i === chars.length - 1;
     return `
-      <div class="card char-card" data-char-idx="${i}" style="margin-bottom:14px;background:${c.color || ''};border-left:3px solid ${c.color || 'var(--border)'}">
+      <div class="card char-card" data-char-idx="${i}" data-char-role="${esc(c.role||'기타')}" style="margin-bottom:14px;background:${c.color || ''};border-left:3px solid ${c.color || 'var(--border)'}">
         <div style="display:flex;gap:10px;align-items:flex-start">
-          <div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0;align-self:center">
-            <button onclick="moveCharCard(${i},-1)" title="위로"
-              style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 4px;line-height:1;opacity:${isFirst?'.2':'1'};pointer-events:${isFirst?'none':'auto'}">▲</button>
-            <button onclick="moveCharCard(${i},1)" title="아래로"
-              style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:2px 4px;line-height:1;opacity:${isLast?'.2':'1'};pointer-events:${isLast?'none':'auto'}">▼</button>
-          </div>
+          <div class="char-drag-handle" data-char-idx="${i}"
+            style="flex-shrink:0;align-self:center;cursor:grab;color:var(--border);font-size:18px;
+              padding:4px 2px;line-height:1;touch-action:none;user-select:none"
+            title="드래그하여 순서 변경">⠿</div>
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
               <span class="font-serif" style="font-size:16px;font-weight:700">${esc(c.name)}</span>
@@ -1650,7 +1646,8 @@ function renderCharacters() {
     const gKey = 'role_' + roleName;
     const isCollapsed = charGroupCollapsed[gKey] || false;
     html += `<div style="margin-bottom:20px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:${isCollapsed?'0':'10px'};padding:6px 12px;
+      <div class="char-group-folder" data-role="${esc(roleName)}"
+        style="display:flex;align-items:center;gap:10px;margin-bottom:${isCollapsed?'0':'10px'};padding:6px 12px;
         background:var(--cream);border-left:3px solid var(--gold);border-radius:0 8px 8px 0;cursor:pointer"
         onclick="toggleCharGroup('${roleName.replace(/'/g,"\\'")}','role_')">
         <span style="font-size:14px;transition:transform .2s;display:inline-block;transform:rotate(${isCollapsed?'-90':'0'}deg)">▾</span>
@@ -1663,6 +1660,7 @@ function renderCharacters() {
 
   document.getElementById('main').innerHTML = html;
   updateBadges();
+  setTimeout(initCharDrag, 50);
 }
 
 
@@ -6072,6 +6070,187 @@ function moveCharCard(idx, dir) {
   const newIdx = idx + dir;
   if (newIdx < 0 || newIdx >= chars.length) return;
   [chars[idx], chars[newIdx]] = [chars[newIdx], chars[idx]];
+  autoSave();
+  renderCharacters();
+}
+
+// ═══════════════════════════════════════════════════════════
+// 캐릭터 카드 드래그 앤 드롭 (카테고리 간 이동 포함)
+// ═══════════════════════════════════════════════════════════
+let _cDrag = null;
+
+function initCharDrag() {
+  document.querySelectorAll('.char-drag-handle').forEach(handle => {
+    handle.addEventListener('mousedown', charMouseStart);
+    handle.addEventListener('touchstart', charTouchStart, { passive: false });
+  });
+}
+
+function charTouchStart(e) {
+  e.preventDefault();
+  const t = e.touches[0];
+  charDragInit(e.currentTarget, t.clientX, t.clientY);
+  document.addEventListener('touchmove', charTouchMove, { passive: false });
+  document.addEventListener('touchend', charTouchEnd, { once: true });
+}
+
+function charMouseStart(e) {
+  charDragInit(e.currentTarget, e.clientX, e.clientY);
+  document.addEventListener('mousemove', charMouseMove);
+  document.addEventListener('mouseup', charMouseEnd, { once: true });
+}
+
+function charDragInit(handle, x, y) {
+  const charIdx = +handle.dataset.charIdx;
+  const card = handle.closest('.char-card');
+  const rect = card.getBoundingClientRect();
+
+  // 고스트
+  const name = card.querySelector('.font-serif')?.textContent || '';
+  const ghost = document.createElement('div');
+  ghost.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;
+    width:${rect.width}px;height:40px;z-index:9999;pointer-events:none;
+    box-shadow:0 6px 24px rgba(0,0,0,.18);border-radius:10px;
+    background:var(--gold-light);border:2px solid var(--gold);
+    display:flex;align-items:center;padding:0 16px;gap:10px;opacity:.92;transition:none`;
+  ghost.innerHTML = `<span style="font-size:18px;color:var(--gold)">⠿</span>
+    <span style="font-weight:700;font-size:14px;color:var(--ink)">${name}</span>`;
+  document.body.appendChild(ghost);
+
+  card.style.opacity = '0.3';
+
+  _cDrag = {
+    charIdx,
+    card,
+    ghost,
+    offsetX: x - rect.left,
+    offsetY: y - rect.top,
+    dropTarget: null,   // { beforeCardEl } or { roleEl }
+  };
+}
+
+function charTouchMove(e) {
+  e.preventDefault();
+  if (!_cDrag) return;
+  charDragMove(e.touches[0].clientX, e.touches[0].clientY);
+}
+function charMouseMove(e) {
+  if (!_cDrag) return;
+  charDragMove(e.clientX, e.clientY);
+}
+
+function charDragMove(cx, cy) {
+  const { ghost, offsetX, offsetY, card } = _cDrag;
+
+  // 고스트 자유 이동
+  ghost.style.left = (cx - offsetX) + 'px';
+  ghost.style.top  = (cy - offsetY) + 'px';
+
+  // 이전 인디케이터 제거
+  document.querySelectorAll('.char-drop-line').forEach(el => el.remove());
+  document.querySelectorAll('.char-card').forEach(c => c.style.boxShadow = '');
+  document.querySelectorAll('.char-group-folder').forEach(f => f.style.outline = '');
+
+  // 전체 char-card 중 커서 위치 기준 삽입 위치 결정
+  const allCards = [...document.querySelectorAll('.char-card')];
+  let bestCard = null, bestBefore = true;
+
+  for (const c of allCards) {
+    if (c === card) continue;
+    const r = c.getBoundingClientRect();
+    if (cy >= r.top - 16 && cy <= r.bottom + 16) {
+      bestCard = c;
+      bestBefore = cy < r.top + r.height / 2;
+      break;
+    }
+  }
+
+  if (bestCard) {
+    // 삽입선 표시
+    const line = document.createElement('div');
+    line.className = 'char-drop-line';
+    line.style.cssText = 'position:fixed;left:0;right:0;height:3px;background:var(--gold);z-index:9998;pointer-events:none;border-radius:2px';
+    const r = bestCard.getBoundingClientRect();
+    line.style.top = (bestBefore ? r.top - 2 : r.bottom - 1) + 'px';
+    line.style.left = r.left + 'px';
+    line.style.width = r.width + 'px';
+    document.body.appendChild(line);
+    _cDrag.dropTarget = { cardEl: bestCard, before: bestBefore };
+  } else {
+    // 카드 사이가 아닌 경우 — 폴더 헤더 위에 있는지 확인
+    const folders = [...document.querySelectorAll('.char-group-folder')];
+    for (const folder of folders) {
+      const r = folder.getBoundingClientRect();
+      if (cy >= r.top && cy <= r.bottom) {
+        folder.style.outline = '2px solid var(--gold)';
+        _cDrag.dropTarget = { folderEl: folder };
+        break;
+      }
+    }
+    if (!_cDrag.dropTarget || !_cDrag.dropTarget.folderEl) {
+      _cDrag.dropTarget = null;
+    }
+  }
+}
+
+function charTouchEnd() {
+  document.removeEventListener('touchmove', charTouchMove);
+  charDragCommit();
+}
+function charMouseEnd() {
+  document.removeEventListener('mousemove', charMouseMove);
+  charDragCommit();
+}
+
+function charDragCommit() {
+  if (!_cDrag) return;
+  const { charIdx, card, ghost, dropTarget } = _cDrag;
+  _cDrag = null;
+
+  // 정리
+  ghost.remove();
+  document.querySelectorAll('.char-drop-line').forEach(el => el.remove());
+  document.querySelectorAll('.char-card').forEach(c => c.style.boxShadow = '');
+  document.querySelectorAll('.char-group-folder').forEach(f => f.style.outline = '');
+  if (card) card.style.opacity = '';
+
+  if (!dropTarget) return;
+
+  const p = getProject();
+  const chars = p.characters;
+  const item = chars[charIdx];
+
+  if (dropTarget.cardEl) {
+    // 다른 카드 앞/뒤에 삽입
+    const targetCharIdx = +dropTarget.cardEl.dataset.charIdx;
+    const targetRole = dropTarget.cardEl.dataset.charRole || item.role;
+
+    // 역할 변경 (카테고리 간 이동)
+    item.role = targetRole;
+
+    // 배열에서 꺼내서 삽입
+    chars.splice(charIdx, 1);
+    // splice 후 인덱스 보정
+    const adjustedTarget = targetCharIdx > charIdx ? targetCharIdx - 1 : targetCharIdx;
+    const insertAt = dropTarget.before ? adjustedTarget : adjustedTarget + 1;
+    chars.splice(Math.max(0, Math.min(insertAt, chars.length)), 0, item);
+
+  } else if (dropTarget.folderEl) {
+    // 폴더 헤더에 드롭 → 해당 역할의 마지막에 추가
+    const newRole = dropTarget.folderEl.dataset.role;
+    if (newRole && newRole !== item.role) {
+      item.role = newRole;
+    }
+    // 같은 역할끼리 마지막으로 이동
+    chars.splice(charIdx, 1);
+    // 해당 역할의 마지막 위치 찾기
+    let lastIdx = chars.length;
+    for (let i = chars.length - 1; i >= 0; i--) {
+      if ((chars[i].role || '기타') === item.role) { lastIdx = i + 1; break; }
+    }
+    chars.splice(lastIdx, 0, item);
+  }
+
   autoSave();
   renderCharacters();
 }
