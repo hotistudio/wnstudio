@@ -1,14 +1,6 @@
-// 기존 캐시 전부 삭제 후 비활성화
-self.addEventListener('install', function() {
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', function(e) {
-  e.waitUntil(
-    caches.keys().then(function(keys) {
-      return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-    }).then(function() {
-      return self.clients.claim();
-    })
-  );
-});
+// wnstudio sw.js - updated: 1775189306
+const CACHE = 'wnstudio-1775189306';
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(cache => cache.addAll(['/wnstudio/', '/wnstudio/index.html']))); self.skipWaiting(); });
+self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))); self.clients.claim(); });
+self.addEventListener('fetch', e => { if(e.request.method!=='GET') return; e.respondWith(fetch(e.request,{cache:'no-cache'}).then(res => { if(res&&res.status===200){const clone=res.clone();caches.open(CACHE).then(cache=>cache.put(e.request,clone));} return res; }).catch(()=>caches.match(e.request))); });
+self.addEventListener('message', e => { if(e.data?.type==='SKIP_WAITING') self.skipWaiting(); });
