@@ -23,7 +23,6 @@ window.addEventListener('unhandledrejection', function(e) {
 </script>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#18120a">
-
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2449,6 +2448,7 @@ function renderEditorContent(ch) {
             <span id="font-size-display" style="font-size:11px;color:var(--muted);min-width:28px;text-align:center;font-weight:600">16px</span>
             <button onclick="changeFontSize(1)" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--muted);padding:2px 3px;font-weight:700">＋</button>
           </div>
+          <button class="btn btn-outline btn-sm" onclick="toggleTypewriterMode()" id="typewriter-mode-btn" title="타자기 모드 - 현재 줄이 항상 화면 중앙에" style="font-size:13px">📜 타자기</button>
           <button class="btn btn-outline btn-sm" onclick="togglePomodoro()" id="pomo-toolbar-btn" title="뽀모도로 타이머" style="font-size:13px">🍅 집필</button>
           <button class="btn btn-outline btn-sm" onclick="enterFocusMode()" title="집중 모드" style="font-size:13px">⛶ 집중</button>
           <button class="btn btn-outline btn-sm" id="sym-toggle-btn" onclick="toggleSymbolPalette()" style="font-size:13px">✦ 기호</button>
@@ -2531,7 +2531,7 @@ function renderEditorContent(ch) {
         </div>
       </div>
     </div>`;
-
+  setTimeout(initTypewriterMode, 0);
 }
 
 function toggleChapterMemo() {
@@ -2564,6 +2564,11 @@ function onEditorInput(id, val) {
   // 날짜별 집필량 기록
   const diff = val.length - prevLen;
   if (diff > 0) recordDailyWriting(diff);
+  // 타자기 모드 스크롤
+  if (getTypewriterMode()) {
+    const ta = document.getElementById('prose-editor');
+    if (ta) typewriterScroll(ta);
+  }
   // debounce save
   clearTimeout(window._saveTimer);
   window._saveTimer = setTimeout(() => { autoSave(); updateChapterListItem(ch); }, 800);
@@ -4962,6 +4967,96 @@ function confirmDialog(msg, onOk) {
   bg.querySelector('.cdg-cancel').addEventListener('click', () => bg.remove());
   bg.querySelector('.cdg-ok').addEventListener('click', () => { bg.remove(); onOk(); });
 }
+
+// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// 타자기 모드 (현재 줄이 항상 화면 세로 중앙에)
+// ═══════════════════════════════════════════════════════════
+function getTypewriterMode() {
+  return localStorage.getItem('wnstudio_typewriter') === '1';
+}
+function toggleTypewriterMode() {
+  const on = !getTypewriterMode();
+  localStorage.setItem('wnstudio_typewriter', on ? '1' : '0');
+  applyTypewriterMode();
+  if (on) toast('타자기 모드 켜짐 📜 현재 줄이 화면 중앙에 고정돼요');
+  else toast('타자기 모드 꺼짐');
+}
+function applyTypewriterMode() {
+  const on = getTypewriterMode();
+  const btn = document.getElementById('typewriter-mode-btn');
+  if (btn) {
+    btn.style.color = on ? 'var(--teal)' : '';
+    btn.style.borderColor = on ? 'var(--teal)' : '';
+    btn.textContent = on ? '📜 타자기 ON' : '📜 타자기';
+  }
+  const ta = document.getElementById('prose-editor');
+  if (ta) {
+    if (on) typewriterScroll(ta);
+  }
+}
+
+function typewriterScroll(ta) {
+  if (!getTypewriterMode()) return;
+  const ec = ta.closest('.editor-content');
+  if (!ec) return;
+
+  // mirror div로 커서 Y 위치 계산
+  let mirror = document.getElementById('_tw_mirror');
+  if (!mirror) {
+    mirror = document.createElement('div');
+    mirror.id = '_tw_mirror';
+    document.body.appendChild(mirror);
+  }
+  const cs = getComputedStyle(ta);
+  mirror.style.cssText = 'position:absolute;visibility:hidden;top:0;left:0;pointer-events:none;'
+    + 'width:' + ta.clientWidth + 'px;'
+    + 'font-family:' + cs.fontFamily + ';'
+    + 'font-size:' + cs.fontSize + ';'
+    + 'line-height:' + cs.lineHeight + ';'
+    + 'padding:' + cs.padding + ';'
+    + 'white-space:pre-wrap;word-wrap:break-word;overflow-wrap:break-word;';
+
+  const textBefore = ta.value.substring(0, ta.selectionStart);
+  mirror.innerHTML = textBefore.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    + '<span id="_tw_caret"> </span>';
+
+  const caret = document.getElementById('_tw_caret');
+  const caretTop = caret ? caret.offsetTop : 0;
+  const lineHeight = parseFloat(cs.lineHeight) || 32;
+
+  // ta가 ec 안에서 시작하는 위치 (ec 패딩 포함)
+  const ecPaddingTop = parseFloat(getComputedStyle(ec).paddingTop) || 0;
+  const cursorAbsY = ecPaddingTop + caretTop;
+
+  // 커서 줄 중앙이 ec 중앙에 오도록 스크롤
+  const halfH = ec.clientHeight / 2;
+  const target = cursorAbsY - halfH + lineHeight / 2;
+
+  // 음수면 스크롤 안 함 (텍스트가 아직 화면 절반 미만)
+  ec.scrollTop = Math.max(0, target);
+}
+
+// renderChapters 이후 상태 복원용
+function initTypewriterMode() {
+  applyTypewriterMode();
+  const ta = document.getElementById('prose-editor');
+  if (ta && getTypewriterMode()) typewriterScroll(ta);
+}
+
+// 커서 이동(방향키, 클릭)에도 반응
+document.addEventListener('keyup', e => {
+  if (!getTypewriterMode()) return;
+  const ta = document.getElementById('prose-editor');
+  if (document.activeElement === ta && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','PageUp','PageDown'].includes(e.key)) {
+    typewriterScroll(ta);
+  }
+});
+document.addEventListener('click', e => {
+  if (!getTypewriterMode()) return;
+  const ta = document.getElementById('prose-editor');
+  if (e.target === ta) setTimeout(() => typewriterScroll(ta), 0);
+});
 
 // ═══════════════════════════════════════════════════════════
 // 분할 패널 (참고 패널)
@@ -8460,57 +8555,4 @@ function renderFamily() {
             ${isChild?`<span style="font-size:12px;color:${f.color||'var(--gold)'};font-weight:700">└</span>`:''}
             <span style="font-size:11px;color:var(--muted);transition:transform .2s;display:inline-block;transform:rotate(${collapsed?'-90':'0'}deg)">▾</span>
             <span class="font-display" style="font-size:${isChild?'15':'17'}px">${esc(f.name)}</span>
-            <span class="tag" style="background:var(--teal-light);color:var(--teal);border-color:var(--teal)">${({'family':'가문','guild':'길드','knight':'기사단','crime_f':'범죄조직','religion':'종교','academic':'학술','politics':'정치','corp':'기업','school':'학교','crime_m':'범죄조직','media':'미디어','military':'군사','politics_m':'정치','korean':'한국풍','chinese':'중국풍','japanese':'일본풍','other':'기타'}[f.groupType||'family']||'가문')}</span>
-            ${f.rank?`<span class="tag">${esc(f.rank)}</span>`:''}
-            ${totalMembers>0?`<span style="font-size:11px;color:var(--muted)">${totalMembers}명</span>`:''}
-          </div>
-          <div style="display:flex;gap:4px;align-items:center" onclick="event.stopPropagation()">
-            ${!isChild?`
-            <button onclick="moveFamilyCard(${fi},-1)"
-              style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:4px;opacity:${isFirst?'.2':'1'};pointer-events:${isFirst?'none':'auto'}">▲</button>
-            <button onclick="moveFamilyCard(${fi},1)"
-              style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:4px;opacity:${isLast?'.2':'1'};pointer-events:${isLast?'none':'auto'}">▼</button>`:''}
-            <button class="btn-icon" onclick="showFamilyModal(${fi})">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-            <button onclick="deleteFamily(${fi})" style="width:28px;height:28px;border-radius:50%;background:rgba(181,69,27,.1);border:none;cursor:pointer;color:var(--rust);font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center">×</button>
-          </div>
-        </div>
-        ${collapsed ? '' : `
-        <div style="padding:0 14px 12px">
-          ${f.description?`<div style="font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.7">${esc(f.description)}</div>`:''}
-          <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
-            ${renderFamilyTabs(f, fi)}
-          </div>
-        </div>`}
-      </div>`;
-  }
-
-  const roots = families.filter(f => !f.parentName);
-  let familyCards = families.length === 0
-    ? `<div class="card empty-state"><div class="emoji">🏰</div><p>가문 및 집단을 추가해보세요.</p></div>`
-    : roots.map(f => {
-        const fi = families.indexOf(f);
-        const children = families.filter(cf => cf.parentName === f.name);
-        const collapsed = familyCollapsed['f'+fi];
-        let html = renderFamilyCard(f, fi, false);
-        if (children.length > 0 && !collapsed) {
-          html += `<div style="margin-bottom:12px">
-            ${children.map(cf => renderFamilyCard(cf, families.indexOf(cf), true)).join('')}
-          </div>`;
-        }
-        return html;
-      }).join('');
-
-  document.getElementById('main').innerHTML = `
-    <div style="max-width:780px;margin:0 auto">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px">
-        <h2 class="font-display" style="font-size:22px">가문 및 집단 (${families.length})</h2>
-        <button class="btn btn-gold" onclick="showFamilyModal()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          추가
-        </button>
-      </div>
-      ${familyCards}
-    </div>`;
-  updateBadges();
+            <span class="tag" style="background:var(--teal-light);color:var(--teal);border-color:var(--teal)">${({'family':'가문','guild':'길드','knight':'기사단','crime_f':'범
