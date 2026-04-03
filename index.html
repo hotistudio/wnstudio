@@ -4,8 +4,33 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>호필 스튜디오</title>
+<script>
+window.onerror = function(msg, src, line, col, err) {
+  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;color:red;background:#fff;white-space:pre-wrap;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;overflow:auto">'
+    + '🚨 오류\n\n' + msg + '\n\n파일: ' + src + '\n라인: ' + line + ':' + col
+    + (err ? '\n\n' + err.stack : '') + '</div>';
+};
+window.addEventListener('unhandledrejection', function(e) {
+  var msg = e.reason ? (e.reason.stack || String(e.reason)) : String(e);
+  // SW/PWA 관련 무해한 오류 무시
+  if (msg.indexOf('SecurityError') !== -1) return;
+  if (msg.indexOf('ServiceWorker') !== -1) return;
+  if (msg.indexOf('getRegistration') !== -1) return;
+  if (msg.indexOf('null origin') !== -1) return;
+  document.body.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;color:red;background:#fff;white-space:pre-wrap;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;overflow:auto">'
+    + '🚨 Promise 오류\n\n' + msg + '</div>';
+});
+</script>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#18120a">
+<script>
+if ('serviceWorker' in navigator && location.protocol !== 'null:') {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/wnstudio/sw.js', { scope: '/wnstudio/' })
+      .catch(function() {});
+  });
+}
+</script>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -8537,14 +8562,4 @@ function renderFamily() {
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             ${isChild?`<span style="font-size:12px;color:${f.color||'var(--gold)'};font-weight:700">└</span>`:''}
             <span style="font-size:11px;color:var(--muted);transition:transform .2s;display:inline-block;transform:rotate(${collapsed?'-90':'0'}deg)">▾</span>
-            <span class="font-display" style="font-size:${isChild?'15':'17'}px">${esc(f.name)}</span>
-            <span class="tag" style="background:var(--teal-light);color:var(--teal);border-color:var(--teal)">${({'family':'가문','guild':'길드','knight':'기사단','crime_f':'범죄조직','religion':'종교','academic':'학술','politics':'정치','corp':'기업','school':'학교','crime_m':'범죄조직','media':'미디어','military':'군사','politics_m':'정치','korean':'한국풍','chinese':'중국풍','japanese':'일본풍','other':'기타'}[f.groupType||'family']||'가문')}</span>
-            ${f.rank?`<span class="tag">${esc(f.rank)}</span>`:''}
-            ${totalMembers>0?`<span style="font-size:11px;color:var(--muted)">${totalMembers}명</span>`:''}
-          </div>
-          <div style="display:flex;gap:4px;align-items:center" onclick="event.stopPropagation()">
-            ${!isChild?`
-            <button onclick="moveFamilyCard(${fi},-1)"
-              style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:4px;opacity:${isFirst?'.2':'1'};pointer-events:${isFirst?'none':'auto'}">▲</button>
-            <button onclick="moveFamilyCard(${fi},1)"
-              style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:4px;opacity:${isLast?'.2':'1'};pointer-events:${isLast?'none':'auto'}">▼</
+            <span
