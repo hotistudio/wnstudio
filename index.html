@@ -8554,4 +8554,887 @@ function renderFamily() {
           <div style="display:flex;gap:4px;align-items:center" onclick="event.stopPropagation()">
             ${!isChild?`
             <button onclick="moveFamilyCard(${fi},-1)"
-              style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:4px;opacity
+              style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:4px;opacity:${isFirst?'.2':'1'};pointer-events:${isFirst?'none':'auto'}">▲</button>
+            <button onclick="moveFamilyCard(${fi},1)"
+              style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:4px;opacity:${isLast?'.2':'1'};pointer-events:${isLast?'none':'auto'}">▼</button>`:''}
+            <button class="btn-icon" onclick="showFamilyModal(${fi})">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button onclick="deleteFamily(${fi})" style="width:28px;height:28px;border-radius:50%;background:rgba(181,69,27,.1);border:none;cursor:pointer;color:var(--rust);font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center">×</button>
+          </div>
+        </div>
+        ${collapsed ? '' : `
+        <div style="padding:0 14px 12px">
+          ${f.description?`<div style="font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.7">${esc(f.description)}</div>`:''}
+          <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+            ${renderFamilyTabs(f, fi)}
+          </div>
+        </div>`}
+      </div>`;
+  }
+
+  const roots = families.filter(f => !f.parentName);
+  let familyCards = families.length === 0
+    ? `<div class="card empty-state"><div class="emoji">🏰</div><p>가문 및 집단을 추가해보세요.</p></div>`
+    : roots.map(f => {
+        const fi = families.indexOf(f);
+        const children = families.filter(cf => cf.parentName === f.name);
+        const collapsed = familyCollapsed['f'+fi];
+        let html = renderFamilyCard(f, fi, false);
+        if (children.length > 0 && !collapsed) {
+          html += `<div style="margin-bottom:12px">
+            ${children.map(cf => renderFamilyCard(cf, families.indexOf(cf), true)).join('')}
+          </div>`;
+        }
+        return html;
+      }).join('');
+
+  document.getElementById('main').innerHTML = `
+    <div style="max-width:780px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px">
+        <h2 class="font-display" style="font-size:22px">가문 및 집단 (${families.length})</h2>
+        <button class="btn btn-gold" onclick="showFamilyModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          추가
+        </button>
+      </div>
+      ${familyCards}
+    </div>`;
+  updateBadges();
+  setTimeout(initMemberDrag, 100);
+}
+
+
+function showFamilyModal(idx) {
+  const p = getProject();
+  const f = idx !== undefined ? (p.families||[])[idx] : {};
+  const FAMILY_COLORS = ['#c4922a','#e53935','#1e88e5','#43a047','#8e24aa','#546e7a','#e64a19','#00897b'];
+  const FM_TYPES_MODAL = [
+    {id:'family', label:'가문', subs:['직계','방계','사용인','동맹 가문','외척']},
+    {id:'guild', label:'길드 (판타지)', subs:['마법사 길드','전사 길드','도적 길드','상인 길드','탐험가 길드','제작자 길드','연금술사 길드']},
+    {id:'knight', label:'기사단/군사 (판타지)', subs:['근위대','원정대','용병단','반란군','저항군','혁명군','정규군','성기사단']},
+    {id:'crime_f', label:'범죄조직 (판타지)', subs:['마피아','도적단','암살단','밀수단','지하조직','비밀결사','사기단']},
+    {id:'religion', label:'종교/신앙', subs:['교단','신전','이단','수도회','예언자 집단','사교단','성직자회']},
+    {id:'academic', label:'학계/연구 (판타지)', subs:['마법학회','연구소','학파','현자 집단','탐구회','마도연구원']},
+    {id:'politics', label:'정치/파벌 (판타지)', subs:['왕당파','귀족파벌','혁명파','의회파','황실','원로원','추밀원']},
+    {id:'corp', label:'기업/조직 (현대)', subs:['대기업','중소기업','스타트업','NGO','정부기관','공기업','재단','로펌']},
+    {id:'school', label:'학교/연구 (현대)', subs:['초중고등학교','대학교','대학원','연구소','싱크탱크','학원','연구팀']},
+    {id:'crime_m', label:'범죄조직 (현대)', subs:['갱단','카르텔','마약조직','해커 집단','테러 조직','조폭','사이비 종교','사기 집단']},
+    {id:'media', label:'미디어/문화 (현대)', subs:['방송국','언론사','연예기획사','스포츠팀','광고회사','출판사','영화사']},
+    {id:'military', label:'군사/경찰 (현대)', subs:['군대','특수부대','경찰서','정보기관','용병 회사','민간군사기업','자경단']},
+    {id:'politics_m', label:'정치/파벌 (현대)', subs:['정당','시민단체','압력단체','로비단체','지하운동','혁명조직','의회파벌']},
+    {id:'korean', label:'한국풍', subs:['왕실/내명부','의금부/포도청','삼사(사헌부·사간원·홍문관)','훈련도감/어영청','금군/별기군','화랑도','의병단','보부상/객주','향약계/두레','동학교단','불사(절)','무속 집단','권번(기생조합)','의녀 집단','역관 집단','서얼 집단']},
+    {id:'chinese', label:'중국풍 (무협)', subs:['정파 문파','사파 문파','마교','검문','도문','권파','황실/조정','내각/어사대','금위군','환관 집단','표국','상회','비밀결사','도방','불문','도관','강호','녹림/흑도']},
+    {id:'japanese', label:'일본풍', subs:['막부/쇼군','다이묘 가문','사무라이 집단','닌자 조직','로닌 집단','상인 길드(자','신사/불교 집단','무사도 집단','이세력/반막부','마을 자경단','기녀(게이샤) 집단','학자 집단(난학)']},
+    {id:'other', label:'기타', subs:['동호회','동아리','모험가 파티','용사 일행','온라인 커뮤니티','비공개 모임','기타 집단']},
+  ];
+  const curType = f.groupType || 'family';
+  const curSub = f.groupSub || '';
+  const curTypeSubs = (FM_TYPES_MODAL.find(t=>t.id===curType)||FM_TYPES_MODAL[0]).subs;
+  showModal(`
+    <div class="modal-title">${idx!==undefined?'가문 및 집단 수정':'가문 및 집단 추가'}</div>
+    <div style="margin-bottom:12px"><label class="label">이름 *</label>
+      <input id="fm-name" value="${esc(f.name||'')}" placeholder="예: 아르켄 가문, 용사 파티, 상인 길드"></div>
+    <div style="margin-bottom:12px">
+      <label class="label">유형</label>
+      <select id="fm-type" onchange="updateFmSubs(this.value,'')" style="width:100%;margin-bottom:6px">
+        ${FM_TYPES_MODAL.map(t=>`<option value="${t.id}" ${curType===t.id?'selected':''}>${t.label}</option>`).join('')}
+      </select>
+      <select id="fm-sub" style="width:100%">
+        ${curTypeSubs.map(s=>`<option value="${s}" ${curSub===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    <div style="margin-bottom:12px"><label class="label">상위 가문/집단 (선택)</label>
+      <select id="fm-parent">
+        <option value="">없음 (독립)</option>
+        ${(p.families||[]).filter((pf,i) => i !== idx && pf.name !== f.name).map(pf=>`<option value="${esc(pf.name)}" ${(f.parentName===pf.name)?'selected':''}>${esc(pf.name)}</option>`).join('')}
+      </select></div>
+    <div style="margin-bottom:12px"><label class="label">등급/직위</label>
+      <input id="fm-rank" value="${esc(f.rank||'')}" placeholder="예: 공작가, 1등급, 최상위"></div>
+    <div style="margin-bottom:14px"><label class="label">설명</label>
+      <textarea id="fm-desc" rows="3" placeholder="역사, 특징, 가훈, 목표 등">${esc(f.description||'')}</textarea></div>
+    <div style="margin-bottom:20px">
+      <label class="label">색상</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px" id="fm-color-group">
+        ${FAMILY_COLORS.map((c,i)=>`
+          <button type="button" onclick="selectEdgeOpt('fm-color-group',this,'${c}')"
+            data-val="${c}" ${(f.color||FAMILY_COLORS[0])===c?'data-selected="1"':''}
+            style="width:32px;height:32px;border-radius:50%;background:${c};cursor:pointer;
+              border:3px solid ${(f.color||FAMILY_COLORS[0])===c?'var(--ink)':'transparent'};
+              transition:all .15s"></button>`).join('')}
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">취소</button>
+      <button class="btn btn-gold" onclick="saveFamily(${idx})">저장</button>
+    </div>`, false);
+  setTimeout(()=>document.getElementById('fm-name')?.focus(),100);
+}
+
+function saveFamily(idx) {
+  const name = document.getElementById('fm-name').value.trim();
+  if (!name) { toast('가문 이름을 입력해주세요.'); return; }
+  const p = getProject();
+  if (!p.families) p.families = [];
+  const f = {
+    id: idx!==undefined ? p.families[idx].id : uid(),
+    name,
+    parentName: document.getElementById('fm-parent')?.value || '',
+    groupType: document.getElementById('fm-type')?.value || 'family',
+    groupSub: document.getElementById('fm-sub')?.value || '',
+    rank: document.getElementById('fm-rank').value,
+    description: document.getElementById('fm-desc').value,
+    color: document.querySelector('#fm-color-group [data-selected]')?.dataset?.val || '#c4922a',
+    members: idx!==undefined ? p.families[idx].members||[] : [],
+    groups: idx!==undefined ? p.families[idx].groups||{} : {},
+  };
+  if (idx!==undefined) p.families[idx]=f; else p.families.push(f);
+  autoSave(); closeModal();
+  refreshSplitPanel();
+  if (!document.getElementById('focus-overlay')?.classList.contains('active')) renderFamily();
+  toast(idx!==undefined?'수정했습니다.':'가문을 추가했습니다!');
+}
+
+function deleteFamily(idx) {
+  confirmDialog('이 가문 및 집단을 삭제합니다.', () => {
+    getProject().families.splice(idx,1);
+    autoSave(); renderFamily();
+    toast('가문 및 집단을 삭제했어요.');
+  });
+}
+
+function showAddMemberModal(fi) {
+  const p = getProject();
+  const f = p.families[fi];
+  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+  const chars = p.characters || [];
+  showModal(`
+    <div class="modal-title">${tab} 구성원 추가</div>
+    ${chars.length > 0 ? `
+    <div style="margin-bottom:14px;padding:10px 12px;background:var(--cream);border-radius:8px;border:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">등장인물에서 불러오기</div>
+      <select onchange="fillMemberFromChar(this)" style="width:100%;font-size:13px">
+        <option value="">— 인물 선택 —</option>
+        ${chars.map(c => `<option value="${esc(c.name)}|${esc(c.age||'')}|${esc(c.gender||'')}|${esc(c.alive||'생존')}">${esc(c.name)}${c.role?` (${esc(c.role)})`:''}</option>`).join('')}
+      </select>
+    </div>` : ''}
+    <div class="form-grid">
+      <div class="full"><label class="label">이름 *</label>
+        <input id="mb-name" placeholder="예: 아르켄 레온하르트"></div>
+      <div><label class="label">나이</label>
+        <input id="mb-age" placeholder="예: 24" type="number" min="0"></div>
+      <div><label class="label">성별</label>
+        <select id="mb-gender">
+          <option value="">미지정</option>
+          <option value="남">남성</option>
+          <option value="여">여성</option>
+          <option value="기타">기타</option>
+        </select></div>
+      <div><label class="label">생사 여부</label>
+        <select id="mb-alive">
+          <option value="생존">생존</option>
+          <option value="사망">사망</option>
+          <option value="불명">불명</option>
+          <option value="불사">불사/불멸</option>
+        </select></div>
+      <div><label class="label">관계/직위</label>
+        <input id="mb-relation" placeholder="예: 가주, 장남, 3세"></div>
+      <div class="full"><label class="label">비고</label>
+        <input id="mb-note" placeholder="예: 현재 실종, 마법 능력 보유"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">취소</button>
+      <button class="btn btn-gold" onclick="saveFamilyMember(${fi})">추가</button>
+    </div>`, false);
+  setTimeout(()=>document.getElementById('mb-name')?.focus(),100);
+}
+
+function fillMemberFromChar(sel) {
+  const val = sel.value;
+  if (!val) return;
+  const [name, age, gender, alive] = val.split('|');
+  const nameEl = document.getElementById('mb-name');
+  const ageEl  = document.getElementById('mb-age');
+  const genEl  = document.getElementById('mb-gender');
+  const alvEl  = document.getElementById('mb-alive');
+  if (nameEl) nameEl.value = name;
+  if (ageEl)  ageEl.value  = age;
+  if (genEl) {
+    const map = {'남':'남','남성':'남','여':'여','여성':'여','기타':'기타'};
+    genEl.value = map[gender] || '';
+  }
+  if (alvEl) {
+    const map = {'생존':'생존','사망':'사망','불명':'불명','불사':'불사','불사/불멸':'불사'};
+    alvEl.value = map[alive] || '생존';
+  }
+  sel.value = ''; // 선택 초기화
+  document.getElementById('mb-relation')?.focus();
+}
+
+function showEditMemberModal(fi, mi) {
+  const p = getProject();
+  const f = p.families[fi];
+  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+  const m = (f.groups && f.groups[tab]) ? f.groups[tab][mi] : null;
+  if (!m) return;
+  showModal(`
+    <div class="modal-title">구성원 수정</div>
+    <div class="form-grid">
+      <div class="full"><label class="label">이름 *</label>
+        <input id="mb-name" value="${esc(m.name||'')}" placeholder="예: 아르켄 레온하르트"></div>
+      <div><label class="label">나이</label>
+        <input id="mb-age" value="${esc(m.age||'')}" placeholder="예: 24" type="number" min="0"></div>
+      <div><label class="label">성별</label>
+        <select id="mb-gender">
+          <option value="" ${!m.gender?'selected':''}>미지정</option>
+          <option value="남" ${ m.gender==='남'?'selected':''}>남성</option>
+          <option value="여" ${ m.gender==='여'?'selected':''}>여성</option>
+          <option value="기타" ${ m.gender==='기타'?'selected':''}>기타</option>
+        </select></div>
+      <div><label class="label">생사 여부</label>
+        <select id="mb-alive">
+          <option value="생존" ${(m.alive||'생존')==='생존'?'selected':''}>생존</option>
+          <option value="사망" ${ m.alive==='사망'?'selected':''}>사망</option>
+          <option value="불명" ${ m.alive==='불명'?'selected':''}>불명</option>
+          <option value="불사" ${ m.alive==='불사'?'selected':''}>불사/불멸</option>
+        </select></div>
+      <div><label class="label">관계/직위</label>
+        <input id="mb-relation" value="${esc(m.relation||'')}" placeholder="예: 가주, 장남, 3세"></div>
+      <div class="full"><label class="label">비고</label>
+        <input id="mb-note" value="${esc(m.note||'')}" placeholder="예: 현재 실종, 마법 능력 보유"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">취소</button>
+      <button class="btn btn-gold" onclick="updateFamilyMember(${fi},${mi})">저장</button>
+    </div>`, false);
+  setTimeout(()=>document.getElementById('mb-name')?.focus(),100);
+}
+
+function updateFamilyMember(fi, mi) {
+  const name = document.getElementById('mb-name').value.trim();
+  if (!name) { toast('이름을 입력해주세요.'); return; }
+  const p = getProject();
+  const f = p.families[fi];
+  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+  if (!f.groups || !f.groups[tab]) return;
+  f.groups[tab][mi] = {
+    ...f.groups[tab][mi],
+    name,
+    age: document.getElementById('mb-age')?.value || '',
+    gender: document.getElementById('mb-gender')?.value || '',
+    alive: document.getElementById('mb-alive')?.value || '생존',
+    relation: document.getElementById('mb-relation').value,
+    note: document.getElementById('mb-note').value,
+  };
+  autoSave(); closeModal(); renderFamily();
+  toast('수정했습니다.');
+}
+
+function saveFamilyMember(fi) {
+  const name = document.getElementById('mb-name').value.trim();
+  if (!name) { toast('이름을 입력해주세요.'); return; }
+  const p = getProject();
+  const f = p.families[fi];
+  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+  if (!f.groups) f.groups = {};
+  if (!f.groups[tab]) f.groups[tab] = [];
+  f.groups[tab].push({
+    name,
+    age: document.getElementById('mb-age')?.value || '',
+    gender: document.getElementById('mb-gender')?.value || '',
+    alive: document.getElementById('mb-alive')?.value || '생존',
+    relation: document.getElementById('mb-relation').value,
+    note: document.getElementById('mb-note').value,
+  });
+  autoSave(); closeModal(); renderFamily();
+}
+
+function deleteFamilyMember(fi, mi) {
+  const p = getProject();
+  const f = p.families[fi];
+  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+  if (f.groups && f.groups[tab]) {
+    f.groups[tab].splice(mi, 1);
+  }
+  autoSave(); renderFamily();
+  toast('구성원을 삭제했어요.');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+loadFromStorage();
+initDarkMode();
+initColorTheme();
+applyEditorFontSize();
+renderHome();
+history.replaceState({screen:'home'}, null);
+setTimeout(() => { tryAutoReconnect(); }, 300);
+
+// 뒤로가기 처리
+window.addEventListener('popstate', e => {
+  const s = e.state;
+  if (!s || s.screen === 'home') { goHome(); return; }
+  if (s.screen === 'tab') {
+    if (s.id && s.id !== state.activeProjectId) {
+      // 다른 프로젝트면 그 프로젝트로
+      openProject(s.id);
+    } else if (s.id && state.activeProjectId) {
+      // 같은 프로젝트 내 탭 이동
+      navigate(s.tab);
+    } else {
+      goHome();
+    }
+  }
+});
+
+// PWA Service Worker 등록
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/wnstudio/sw.js', { scope: '/wnstudio/' })
+      .then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const newSW = reg.installing;
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'installed') {
+              newSW.postMessage({type: 'SKIP_WAITING'});
+            }
+          });
+        });
+        setInterval(() => reg.update(), 60000);
+      })
+      .catch(e => {});
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 종료 전 백업 알림
+// ═══════════════════════════════════════════════════════════════
+const BACKUP_KEY = 'wnstudio_last_backup';
+
+function getLastBackupTime() {
+  return localStorage.getItem(BACKUP_KEY) ? new Date(localStorage.getItem(BACKUP_KEY)) : null;
+}
+function setLastBackupTime() {
+  localStorage.setItem(BACKUP_KEY, new Date().toISOString());
+}
+
+// 백업 알림 배너 표시
+function showBackupBanner() {
+  if (document.getElementById('backup-banner')) return;
+  const last = getLastBackupTime();
+  const lastText = last
+    ? `마지막 백업: ${last.toLocaleDateString('ko-KR')} ${last.toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit'})}`
+    : '아직 백업한 적 없어요';
+
+  const banner = document.createElement('div');
+  banner.id = 'backup-banner';
+  banner.style.cssText = `
+    position:fixed;bottom:0;left:0;right:0;z-index:9000;
+    background:#18120a;color:#fff;padding:14px 20px;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    box-shadow:0 -4px 20px rgba(0,0,0,.3);
+    animation:slideUpBanner .3s ease;
+  `;
+  banner.innerHTML = `
+    <style>@keyframes slideUpBanner{from{transform:translateY(100%)}to{transform:translateY(0)}}</style>
+    <span style="font-size:18px">💾</span>
+    <div style="flex:1;min-width:200px">
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px">앱을 닫기 전에 백업하시겠어요?</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.6)">${lastText}</div>
+    </div>
+    <button onclick="backupAllAndClose()" style="
+      background:var(--gold);color:#fff;border:none;border-radius:8px;
+      padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;
+      font-family:'Noto Sans KR',sans-serif;white-space:nowrap;
+    ">전체 백업 후 닫기</button>
+    <button onclick="exportData();setLastBackupTime();dismissBackupBanner();" style="
+      background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;
+      padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;
+      font-family:'Noto Sans KR',sans-serif;white-space:nowrap;
+    ">현재 작품만 백업</button>
+    <button onclick="dismissBackupBanner()" style="
+      background:transparent;color:rgba(255,255,255,.5);border:none;
+      border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer;
+      font-family:'Noto Sans KR',sans-serif;white-space:nowrap;
+    ">나중에</button>
+  `;
+  document.body.appendChild(banner);
+}
+
+function dismissBackupBanner() {
+  const b = document.getElementById('backup-banner');
+  if (b) b.remove();
+}
+
+// 전체 작품 백업 (모든 작품을 하나의 JSON으로)
+function backupAllAndClose() {
+  const blob = new Blob([JSON.stringify(state.projects, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '웹소설스튜디오_전체백업_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  setLastBackupTime();
+  dismissBackupBanner();
+  toast('전체 백업 완료! 📁');
+}
+
+// exportData도 백업 시간 기록하도록 오버라이드
+const _origExport = exportData;
+exportData = function() {
+  _origExport();
+  setLastBackupTime();
+};
+
+// beforeunload 제거 (PWA에서 오동작)
+
+// 페이지 숨김(탭 전환, 홈 버튼 등) 감지 → 배너 표시
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    if (state.projects.length === 0) return;
+    const last = getLastBackupTime();
+    const now = new Date();
+    const hoursSince = last ? (now - last) / 1000 / 60 / 60 : 999;
+    if (hoursSince > 1) {
+      // 다시 돌아왔을 때 배너 표시
+      document.addEventListener('visibilitychange', function showOnReturn() {
+        if (document.visibilityState === 'visible') {
+          showBackupBanner();
+          document.removeEventListener('visibilitychange', showOnReturn);
+        }
+      });
+    }
+  }
+});
+</script>
+
+<div id="focus-overlay">
+  <div id="focus-toolbar">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-family:'Black Han Sans',sans-serif;font-size:14px;color:var(--gold)">집중 모드</span>
+      <span id="focus-wordcount">0자</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:4px;background:var(--cream);border:1px solid var(--border);border-radius:7px;padding:2px 6px">
+        <button onclick="changeFontSize(-1)" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted);padding:2px 4px;font-weight:700">−</button>
+        <span id="focus-font-size" style="font-size:11px;color:var(--muted);min-width:28px;text-align:center;font-weight:600">16px</span>
+        <button onclick="changeFontSize(1)" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted);padding:2px 4px;font-weight:700">＋</button>
+      </div>
+      <button onclick="toggleFocusRef()" id="focus-ref-btn"
+        style="background:transparent;border:1.5px solid var(--border);border-radius:8px;
+          padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;
+          color:var(--muted);font-family:'Noto Sans KR',sans-serif">⊞ 참고</button>
+      <button onclick="togglePomodoro()"
+        style="background:transparent;border:1.5px solid var(--border);border-radius:8px;
+          padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;
+          color:var(--muted);font-family:'Noto Sans KR',sans-serif">🍅 집필</button>
+      <button id="focus-exit-btn" onclick="exitFocusMode()">✕ 나가기 (ESC)</button>
+    </div>
+  </div>
+  <div id="focus-shortcut-bar" style="padding:5px 12px;background:var(--cream);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:4px;flex-wrap:wrap;flex-shrink:0"></div>
+  <div style="display:flex;flex:1;overflow:hidden">
+    <div id="focus-editor-wrap" style="flex:1;overflow-y:auto;display:flex;justify-content:center;padding:40px 24px">
+      <textarea id="focus-editor" placeholder="이야기를 시작하세요..."></textarea>
+    </div>
+    <!-- 집중 모드 참고 패널 -->
+    <div id="focus-ref-panel" style="display:none;width:320px;flex-shrink:0;
+      border-left:1.5px solid var(--border);background:var(--paper);
+      display:none;flex-direction:column;overflow:hidden">
+      <div style="display:flex;gap:2px;padding:8px 10px 0;
+        border-bottom:1px solid var(--border);background:var(--cream);flex-shrink:0;overflow-x:auto">
+        <button class="split-tab active" onclick="focusRefTab('overview')">📋 개요</button>
+        <button class="split-tab" onclick="focusRefTab('world')">🌍 세계관</button>
+        <button class="split-tab" onclick="focusRefTab('plot')">📐 플롯</button>
+        <button class="split-tab" onclick="focusRefTab('characters')">👤 인물</button>
+        <button class="split-tab" onclick="focusRefTab('family')">🏰 가문</button>
+        <button class="split-tab" onclick="focusRefTab('glossary')">📖 용어</button>
+        <button class="split-tab" onclick="focusRefTab('items')">📦 아이템</button>
+        <button class="split-tab" onclick="focusRefTab('memo')">📝 메모</button>
+      </div>
+      <div id="focus-ref-content" style="flex:1;overflow-y:auto;padding:16px"></div>
+      <!-- 화별 메모 고정 -->
+      <div style="flex-shrink:0;border-top:1.5px solid var(--border);background:var(--cream)">
+        <div style="display:flex;align-items:center;justify-content:space-between;
+          padding:6px 14px;cursor:pointer;user-select:none"
+          onclick="toggleFocusChapterMemo()">
+          <span style="font-size:11px;font-weight:700;color:var(--muted)">
+            📝 <span style="color:var(--gold)" id="focus-ch-memo-title">메모</span>의 메모
+          </span>
+          <span id="focus-ch-memo-arrow" style="font-size:10px;color:var(--muted);
+            transition:transform .2s;display:inline-block;transform:rotate(-90deg)">▾</span>
+        </div>
+        <div id="focus-ch-memo-body" style="display:none;padding:0 10px 10px">
+          <textarea id="focus-ch-memo-input" rows="3" placeholder="이 화에 대한 메모..."
+            style="width:100%;font-size:12px;line-height:1.8;resize:vertical;
+              background:var(--white);border:1.5px solid var(--border);border-radius:8px;
+              padding:7px 10px;font-family:'Noto Serif KR',serif;color:var(--ink)"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ═══ 뽀모도로 위젯 ═══════════════════════════════════════ -->
+<div id="pomo-widget" style="display:none;position:fixed;bottom:24px;right:24px;z-index:8000;
+  background:var(--ink);color:#fff;border-radius:16px;
+  box-shadow:0 8px 32px rgba(0,0,0,.35);
+  font-family:'Noto Sans KR',sans-serif;
+  width:220px;overflow:hidden;
+  animation:slideup .2s ease">
+
+  <!-- 헤더 (드래그 핸들) -->
+  <div id="pomo-header" style="display:flex;align-items:center;justify-content:space-between;
+    padding:10px 14px 8px;border-bottom:1px solid rgba(255,255,255,.1);
+    cursor:grab;user-select:none">
+    <div style="display:flex;align-items:center;gap:7px">
+      <span style="font-size:15px">🍅</span>
+      <span id="pomo-mode-label" style="font-size:12px;font-weight:700;letter-spacing:.5px">집필 중</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px">
+      <button onclick="pomoCollapse()" id="pomo-collapse-btn" title="접기"
+        style="background:none;border:none;cursor:pointer;
+        color:rgba(255,255,255,.5);font-size:13px;line-height:1;padding:0 4px">▾</button>
+      <button onclick="closePomodoro()" style="background:none;border:none;cursor:pointer;
+        color:rgba(255,255,255,.5);font-size:16px;line-height:1;padding:0">×</button>
+    </div>
+  </div>
+
+  <!-- 접히는 본문 -->
+  <div id="pomo-body">
+
+  <!-- 타이머 -->
+  <div style="text-align:center;padding:14px 0 10px">
+    <div id="pomo-time" style="font-size:42px;font-weight:700;letter-spacing:2px;
+      font-family:'NanumSquareRound','Black Han Sans',sans-serif;color:#fff">25:00</div>
+    <div id="pomo-session-info" style="font-size:11px;color:rgba(255,255,255,.5);margin-top:4px">
+      세션 1 · 목표 <span id="pomo-goal-display">4</span>회
+    </div>
+  </div>
+
+  <!-- 진행 바 -->
+  <div style="margin:0 14px 12px;height:4px;background:rgba(255,255,255,.15);border-radius:2px">
+    <div id="pomo-progress" style="height:100%;width:100%;background:var(--gold);border-radius:2px;transition:width .5s linear"></div>
+  </div>
+
+  <!-- 컨트롤 -->
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:0 14px 12px">
+    <button onclick="pomoReset()" title="리셋"
+      style="background:rgba(255,255,255,.1);border:none;border-radius:10px;
+        width:56px;height:36px;cursor:pointer;font-size:18px;color:#fff;
+        display:flex;align-items:center;justify-content:center">↺</button>
+    <button id="pomo-playpause" onclick="pomoToggle()"
+      style="background:var(--gold);border:none;border-radius:10px;
+        width:56px;height:36px;cursor:pointer;font-size:18px;color:#fff;font-weight:700;
+        display:flex;align-items:center;justify-content:center">▶</button>
+    <button onclick="pomoSkip()" title="다음으로"
+      style="background:rgba(255,255,255,.1);border:none;border-radius:10px;
+        width:56px;height:36px;cursor:pointer;font-size:18px;color:#fff;
+        display:flex;align-items:center;justify-content:center">⏭</button>
+  </div>
+
+  <!-- 세션 카운터 + 목표 설정 -->
+  <div style="display:flex;align-items:center;justify-content:space-between;
+    padding:8px 14px;border-top:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.2)">
+    <div id="pomo-dots" style="display:flex;gap:5px"></div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:10px;color:rgba(255,255,255,.4)">목표</span>
+      <button onclick="pomoSetGoal(-1)" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,.5);font-size:13px;padding:0 2px">−</button>
+      <span id="pomo-goal-input" style="font-size:12px;font-weight:700;min-width:14px;text-align:center">4</span>
+      <button onclick="pomoSetGoal(1)" style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,.5);font-size:13px;padding:0 2px">＋</button>
+    </div>
+  </div>
+
+  <!-- 타이핑 시간 -->
+  <div style="padding:7px 14px;border-top:1px solid rgba(255,255,255,.08);
+    display:flex;align-items:center;justify-content:space-between">
+    <span style="font-size:10px;color:rgba(255,255,255,.4)">⌨️ 순수 타이핑</span>
+    <span id="pomo-typing-time" style="font-size:11px;font-weight:700;color:rgba(255,255,255,.7)">0분 0초</span>
+  </div>
+
+  <!-- 세션 종료 메시지 -->
+  <div id="pomo-toast" style="display:none;padding:8px 14px;
+    background:var(--teal);font-size:12px;font-weight:600;text-align:center;
+    border-top:1px solid rgba(255,255,255,.1)"></div>
+
+  </div><!-- /pomo-body -->
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// 뽀모도로
+// ═══════════════════════════════════════════════════════════
+const POMO_WORK = 25 * 60;
+const POMO_SHORT = 5 * 60;
+const POMO_LONG = 15 * 60;
+
+let pomoState = {
+  running: false,
+  mode: 'work',
+  remaining: POMO_WORK,
+  total: POMO_WORK,
+  session: 1,
+  goal: 4,
+  completedWork: 0,
+  startChars: 0,
+  timer: null,
+  sessionTypingSec: 0,  // 현재 세션 타이핑 초
+};
+
+// ═══════════════════════════════════════════════════════════
+// 한글 검색 - compositionend로 조합 완료 감지
+// ═══════════════════════════════════════════════════════════
+const _searchHandlers = {
+  'glossary-search-input':  () => { window._glossarySearch = document.getElementById('glossary-search-input').value; renderGlossaryCards(); },
+  'split-glossary-search':  () => { window._glossaryPanelQ = document.getElementById('split-glossary-search')?.value || ''; refreshSplitGlossaryCards(); },
+  'item-search-input':      () => { window._itemSearch = document.getElementById('item-search-input').value; renderItemGrid(); },
+  'split-item-search':      () => { window._splitItemQ = document.getElementById('split-item-search')?.value || ''; refreshSplitItems(); },
+  'split-memo-search':      () => { window._spMemoQ = document.getElementById('split-memo-search')?.value || ''; refreshSplitMemo(); },
+  'fr-find':                () => { frHighlight(false); },
+};
+
+document.addEventListener('compositionend', e => {
+  const id = e.target?.id;
+  if (_searchHandlers[id]) _searchHandlers[id]();
+});
+
+document.addEventListener('compositionupdate', e => {
+  const id = e.target?.id;
+  if (_searchHandlers[id]) setTimeout(() => _searchHandlers[id](), 0);
+});
+
+document.addEventListener('input', e => {
+  const id = e.target?.id;
+  if (_searchHandlers[id] && !e.isComposing) _searchHandlers[id]();
+});
+
+// 타이핑 감지 이벤트 연결
+document.addEventListener('keydown', e => {
+  const ta = document.getElementById('prose-editor');
+  const fe = document.getElementById('focus-editor');
+  if (document.activeElement === ta || document.activeElement === fe) {
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) onTypingKey();
+  }
+});
+
+function pomoCollapse() {
+  const body = document.getElementById('pomo-body');
+  const btn = document.getElementById('pomo-collapse-btn');
+  const collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  btn.textContent = collapsed ? '▾' : '▴';
+  btn.title = collapsed ? '접기' : '펼치기';
+}
+
+function togglePomodoro() {
+  const w = document.getElementById('pomo-widget');
+  if (w.style.display === 'none') {
+    w.style.display = 'block';
+    pomoRenderDots();
+    pomoUpdateDisplay();
+  } else {
+    closePomodoro();
+  }
+}
+
+function closePomodoro() {
+  document.getElementById('pomo-widget').style.display = 'none';
+  if (pomoState.running) pomoToggle(); // 닫아도 일시정지
+}
+
+function pomoToggle() {
+  if (pomoState.running) {
+    clearInterval(pomoState.timer);
+    pomoState.running = false;
+    document.getElementById('pomo-playpause').textContent = '▶';
+  } else {
+    // 집필 세션 시작 시 현재 글자 수 기록
+    if (pomoState.mode === 'work' && pomoState.remaining === POMO_WORK) {
+      const editor = document.getElementById('prose-editor') || document.getElementById('focus-editor');
+      pomoState.startChars = editor ? editor.value.length : 0;
+      resetSessionTyping();
+    }
+    pomoState.running = true;
+    document.getElementById('pomo-playpause').textContent = 'II';
+    pomoState.timer = setInterval(pomoTick, 1000);
+  }
+}
+
+function pomoTick() {
+  if (pomoState.remaining <= 0) {
+    pomoComplete();
+    return;
+  }
+  pomoState.remaining--;
+  pomoUpdateDisplay();
+}
+
+function pomoPlaySound(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = type === 'work'
+      ? [{ f: 880, t: 0, d: 0.3 }, { f: 1100, t: 0.2, d: 0.3 }, { f: 1320, t: 0.4, d: 0.5 }]  // 집필 완료 - 경쾌하게 올라가는 3음
+      : [{ f: 660, t: 0, d: 0.4 }, { f: 550, t: 0.3, d: 0.6 }];  // 휴식 끝 - 부드럽게 내려가는 2음
+    notes.forEach(({ f, t, d }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, ctx.currentTime + t);
+      gain.gain.setValueAtTime(0.4, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + d);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + d);
+    });
+  } catch(e) {}
+}
+
+function pomoComplete() {
+  clearInterval(pomoState.timer);
+  pomoState.running = false;
+  document.getElementById('pomo-playpause').textContent = '▶';
+
+  // 진동
+  navigator.vibrate?.([200, 100, 200]);
+
+  // 소리
+  pomoPlaySound(pomoState.mode);
+
+  if (pomoState.mode === 'work') {
+    // 쓴 글자 수 계산
+    const editor = document.getElementById('prose-editor') || document.getElementById('focus-editor');
+    const written = editor ? Math.max(0, editor.value.length - pomoState.startChars) : 0;
+    pomoState.completedWork++;
+    pomoShowToast(`🎉 집필 완료! +${written.toLocaleString()}자`);
+
+    // 목표 달성 체크
+    if (pomoState.completedWork >= pomoState.goal) {
+      setTimeout(() => pomoShowToast('🏆 오늘 목표 달성!'), 2500);
+    }
+
+    // 긴 휴식 or 짧은 휴식
+    const isLong = pomoState.completedWork % 4 === 0;
+    pomoState.session++;
+    pomoState.mode = isLong ? 'long' : 'short';
+    pomoState.total = isLong ? POMO_LONG : POMO_SHORT;
+    pomoState.remaining = pomoState.total;
+  } else {
+    pomoShowToast('☕ 휴식 끝! 다시 집필해봐요');
+    pomoState.mode = 'work';
+    pomoState.total = POMO_WORK;
+    pomoState.remaining = POMO_WORK;
+  }
+
+  pomoRenderDots();
+  pomoUpdateDisplay();
+}
+
+function pomoReset() {
+  clearInterval(pomoState.timer);
+  pomoState.running = false;
+  pomoState.remaining = pomoState.total;
+  document.getElementById('pomo-playpause').textContent = '▶';
+  pomoHideToast();
+  pomoUpdateDisplay();
+}
+
+function pomoSkip() {
+  clearInterval(pomoState.timer);
+  pomoState.running = false;
+  pomoComplete();
+}
+
+function pomoSetGoal(delta) {
+  pomoState.goal = Math.max(1, Math.min(12, pomoState.goal + delta));
+  document.getElementById('pomo-goal-input').textContent = pomoState.goal;
+  document.getElementById('pomo-goal-display').textContent = pomoState.goal;
+  pomoRenderDots();
+}
+
+function pomoUpdateDisplay() {
+  const m = String(Math.floor(pomoState.remaining / 60)).padStart(2, '0');
+  const s = String(pomoState.remaining % 60).padStart(2, '0');
+  document.getElementById('pomo-time').textContent = m + ':' + s;
+
+  const pct = (pomoState.remaining / pomoState.total) * 100;
+  document.getElementById('pomo-progress').style.width = pct + '%';
+  document.getElementById('pomo-progress').style.background =
+    pomoState.mode === 'work' ? 'var(--gold)' : 'var(--teal2)';
+
+  const modeLabel = { work: '집필 중', short: '짧은 휴식', long: '긴 휴식' };
+  document.getElementById('pomo-mode-label').textContent = modeLabel[pomoState.mode];
+  document.getElementById('pomo-session-info').innerHTML =
+    '세션 ' + pomoState.session + ' · 목표 <span id="pomo-goal-display">' + pomoState.goal + '</span>회';
+}
+
+function pomoRenderDots() {
+  const container = document.getElementById('pomo-dots');
+  if (!container) return;
+  let html = '';
+  for (let i = 0; i < pomoState.goal; i++) {
+    const done = i < pomoState.completedWork;
+    html += '<div style="width:8px;height:8px;border-radius:50%;background:' +
+      (done ? 'var(--gold)' : 'rgba(255,255,255,.2)') + '"></div>';
+  }
+  container.innerHTML = html;
+}
+
+function pomoShowToast(msg) {
+  const t = document.getElementById('pomo-toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => pomoHideToast(), 3000);
+}
+
+function pomoHideToast() {
+  const t = document.getElementById('pomo-toast');
+  if (t) t.style.display = 'none';
+}
+
+// 드래그 이동
+(function() {
+  const widget = document.getElementById('pomo-widget');
+  const header = document.getElementById('pomo-header');
+  let dragging = false, ox = 0, oy = 0;
+
+  function dragStart(cx, cy) {
+    const rect = widget.getBoundingClientRect();
+    // bottom/right 기준 → top/left 기준으로 전환
+    widget.style.bottom = 'auto';
+    widget.style.right = 'auto';
+    widget.style.top = rect.top + 'px';
+    widget.style.left = rect.left + 'px';
+    ox = cx - rect.left;
+    oy = cy - rect.top;
+    dragging = true;
+    header.style.cursor = 'grabbing';
+  }
+
+  function dragMove(cx, cy) {
+    if (!dragging) return;
+    let x = cx - ox;
+    let y = cy - oy;
+    // 화면 밖으로 못 나가게
+    x = Math.max(0, Math.min(window.innerWidth - widget.offsetWidth, x));
+    y = Math.max(0, Math.min(window.innerHeight - widget.offsetHeight, y));
+    widget.style.left = x + 'px';
+    widget.style.top = y + 'px';
+  }
+
+  function dragEnd() {
+    dragging = false;
+    header.style.cursor = 'grab';
+  }
+
+  header.addEventListener('mousedown', e => { if (e.target.tagName !== 'BUTTON') { e.preventDefault(); dragStart(e.clientX, e.clientY); } });
+  document.addEventListener('mousemove', e => dragMove(e.clientX, e.clientY));
+  document.addEventListener('mouseup', dragEnd);
+
+  header.addEventListener('touchstart', e => { if (e.target.tagName !== 'BUTTON') { dragStart(e.touches[0].clientX, e.touches[0].clientY); } }, {passive:true});
+  document.addEventListener('touchmove', e => { if (dragging) { e.preventDefault(); dragMove(e.touches[0].clientX, e.touches[0].clientY); } }, {passive:false});
+  document.addEventListener('touchend', dragEnd);
+})();
+</script>
+
+</body>
+</html>
