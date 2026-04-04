@@ -2424,7 +2424,6 @@ function renderEditorContent(ch) {
             <span id="font-size-display" style="font-size:11px;color:var(--muted);min-width:28px;text-align:center;font-weight:600">16px</span>
             <button onclick="changeFontSize(1)" style="background:none;border:none;cursor:pointer;font-size:15px;color:var(--muted);padding:2px 3px;font-weight:700">＋</button>
           </div>
-          <button class="btn btn-outline btn-sm" onclick="toggleTypewriterMode()" id="typewriter-mode-btn" title="타자기 모드 - 현재 줄이 항상 화면 중앙에" style="font-size:13px">📜 타자기</button>
           <button class="btn btn-outline btn-sm" onclick="togglePomodoro()" id="pomo-toolbar-btn" title="뽀모도로 타이머" style="font-size:13px">🍅 집필</button>
           <button class="btn btn-outline btn-sm" onclick="enterFocusMode()" title="집중 모드" style="font-size:13px">⛶ 집중</button>
           <button class="btn btn-outline btn-sm" id="sym-toggle-btn" onclick="toggleSymbolPalette()" style="font-size:13px">✦ 기호</button>
@@ -2507,7 +2506,6 @@ function renderEditorContent(ch) {
         </div>
       </div>
     </div>`;
-  setTimeout(initTypewriterMode, 0);
 }
 
 function toggleChapterMemo() {
@@ -2540,11 +2538,6 @@ function onEditorInput(id, val) {
   // 날짜별 집필량 기록
   const diff = val.length - prevLen;
   if (diff > 0) recordDailyWriting(diff);
-  // 타자기 모드 스크롤
-  if (getTypewriterMode()) {
-    const ta = document.getElementById('prose-editor');
-    if (ta) typewriterScroll(ta);
-  }
   // debounce save
   clearTimeout(window._saveTimer);
   window._saveTimer = setTimeout(() => { autoSave(); updateChapterListItem(ch); }, 800);
@@ -4944,174 +4937,6 @@ function confirmDialog(msg, onOk) {
   bg.querySelector('.cdg-ok').addEventListener('click', () => { bg.remove(); onOk(); });
 }
 
-// ═══════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════
-// 타자기 모드 — 스크리브너 스타일 타이프라이터 스크롤링
-// 현재 커서 줄이 항상 화면 세로 중앙에 부드럽게 고정
-// ═══════════════════════════════════════════════════════════
-function getTypewriterMode() {
-  return localStorage.getItem('wnstudio_typewriter') === '1';
-}
-
-function toggleTypewriterMode() {
-  const on = !getTypewriterMode();
-  localStorage.setItem('wnstudio_typewriter', on ? '1' : '0');
-  applyTypewriterMode();
-  if (on) toast('타자기 모드 켜짐 📜 커서 줄이 항상 화면 중앙에 고정돼요');
-  else toast('타자기 모드 꺼짐');
-}
-
-// 스크롤 컨테이너에 타이프라이터용 상하 패딩 적용/해제
-// 패딩 덕분에 첫 줄·마지막 줄도 화면 중앙에 올 수 있음
-function _twSetPadding(container, on) {
-  if (!container) return;
-  if (on) {
-    container.dataset.twPadding = '1';
-    container.style.paddingTop = '50vh';
-    container.style.paddingBottom = '50vh';
-  } else if (container.dataset.twPadding) {
-    delete container.dataset.twPadding;
-    container.style.paddingTop = '';
-    container.style.paddingBottom = '';
-  }
-}
-
-function applyTypewriterMode() {
-  const on = getTypewriterMode();
-
-  // 버튼 상태
-  const btn = document.getElementById('typewriter-mode-btn');
-  if (btn) {
-    btn.style.color = on ? 'var(--teal)' : '';
-    btn.style.borderColor = on ? 'var(--teal)' : '';
-    btn.textContent = on ? '📜 타자기 ON' : '📜 타자기';
-  }
-
-  // 집필기 에디터 컨테이너
-  const ta = document.getElementById('prose-editor');
-  const ec = ta ? ta.closest('.editor-content') : null;
-  _twSetPadding(ec, on);
-
-  // 집중 모드 에디터 컨테이너
-  const focusWrap = document.getElementById('focus-editor-wrap');
-  _twSetPadding(focusWrap, on);
-
-  // ON이면 현재 위치로 즉시 스크롤
-  if (on) {
-    if (ta) typewriterScroll(ta, true);
-    const fe = document.getElementById('focus-editor');
-    if (fe && document.getElementById('focus-overlay')?.classList.contains('active')) {
-      typewriterScroll(fe, true);
-    }
-  }
-}
-
-// 커서 Y 위치를 mirror div로 계산
-function _twGetCaretTop(ta) {
-  let mirror = document.getElementById('_tw_mirror');
-  if (!mirror) {
-    mirror = document.createElement('div');
-    mirror.id = '_tw_mirror';
-    document.body.appendChild(mirror);
-  }
-  const cs = getComputedStyle(ta);
-  mirror.style.cssText =
-    'position:absolute;visibility:hidden;top:0;left:0;pointer-events:none;' +
-    'width:' + ta.clientWidth + 'px;' +
-    'font-family:' + cs.fontFamily + ';' +
-    'font-size:' + cs.fontSize + ';' +
-    'line-height:' + cs.lineHeight + ';' +
-    'padding:' + cs.padding + ';' +
-    'white-space:pre-wrap;word-wrap:break-word;overflow-wrap:break-word;box-sizing:border-box;';
-
-  const textBefore = ta.value.substring(0, ta.selectionStart);
-  mirror.innerHTML =
-    textBefore.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') +
-    '<span id="_tw_caret">\u200b</span>';
-
-  const caret = document.getElementById('_tw_caret');
-  return caret ? caret.offsetTop : 0;
-}
-
-// smooth 스크롤 애니메이션 (requestAnimationFrame)
-let _twRafId = null;
-function _twSmoothScroll(container, targetTop, instant) {
-  if (_twRafId) cancelAnimationFrame(_twRafId);
-  if (instant) {
-    container.scrollTop = targetTop;
-    return;
-  }
-  const startTop = container.scrollTop;
-  const dist = targetTop - startTop;
-  if (Math.abs(dist) < 1) return;
-  const duration = Math.min(120, Math.max(60, Math.abs(dist) * 0.3)); // 60~120ms
-  const startTime = performance.now();
-
-  function step(now) {
-    const elapsed = now - startTime;
-    const t = Math.min(1, elapsed / duration);
-    // ease-out cubic
-    const ease = 1 - Math.pow(1 - t, 3);
-    container.scrollTop = startTop + dist * ease;
-    if (t < 1) _twRafId = requestAnimationFrame(step);
-  }
-  _twRafId = requestAnimationFrame(step);
-}
-
-// 핵심 함수: prose-editor 또는 focus-editor 모두 처리
-function typewriterScroll(ta, instant) {
-  if (!getTypewriterMode()) return;
-
-  // 스크롤 컨테이너 결정
-  let container;
-  if (ta.id === 'focus-editor') {
-    container = document.getElementById('focus-editor-wrap');
-  } else {
-    container = ta.closest('.editor-content');
-  }
-  if (!container) return;
-
-  const caretTop = _twGetCaretTop(ta);
-  const cs = getComputedStyle(ta);
-  const lineHeight = parseFloat(cs.lineHeight) || 32;
-
-  // 컨테이너 패딩 상단 (50vh)
-  const padTop = parseFloat(getComputedStyle(container).paddingTop) || 0;
-
-  // 커서 절대 Y = 패딩 + 커서 offsetTop
-  const cursorAbsY = padTop + caretTop;
-
-  // 커서 줄 중앙이 뷰포트 중앙에 오도록
-  const target = cursorAbsY - container.clientHeight / 2 + lineHeight / 2;
-
-  _twSmoothScroll(container, Math.max(0, target), instant);
-}
-
-// renderChapters 이후 상태 복원용
-function initTypewriterMode() {
-  applyTypewriterMode();
-  const ta = document.getElementById('prose-editor');
-  if (ta && getTypewriterMode()) typewriterScroll(ta, true);
-}
-
-// 방향키·Home·End·PageUp·PageDown — prose-editor + focus-editor 모두
-document.addEventListener('keyup', e => {
-  if (!getTypewriterMode()) return;
-  if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End','PageUp','PageDown'].includes(e.key)) return;
-  const active = document.activeElement;
-  if (active?.id === 'prose-editor' || active?.id === 'focus-editor') {
-    typewriterScroll(active);
-  }
-});
-
-// 클릭으로 커서 이동 시 해당 줄로 — prose-editor + focus-editor 모두
-document.addEventListener('click', e => {
-  if (!getTypewriterMode()) return;
-  const t = e.target;
-  if (t?.id === 'prose-editor' || t?.id === 'focus-editor') {
-    setTimeout(() => typewriterScroll(t), 0);
-  }
-});
 
 // ═══════════════════════════════════════════════════════════
 // 분할 패널 (참고 패널)
@@ -5958,8 +5783,6 @@ function enterFocusMode() {
   // 입력 이벤트
   focusEditor.oninput = () => {
     updateFocusWordCount();
-    // 타자기 모드 스크롤
-    if (getTypewriterMode()) typewriterScroll(focusEditor);
     // 원본에도 즉시 반영
     const p2 = getProject();
     const ch2 = (p2?.chapters||[]).find(c => c.id === focusChapterId);
@@ -7579,14 +7402,17 @@ function renderForeshadow() {
   const list = p.foreshadows;
   if (!window._fsFilter)     window._fsFilter = '전체';
   if (!window._fsCharFilter) window._fsCharFilter = '전체';
+  if (!window._fsImpFilter)  window._fsImpFilter = '전체';
+  if (!window._fsTagFilter)  window._fsTagFilter = '전체';
   const filter     = window._fsFilter;
   const charFilter = window._fsCharFilter;
+  const impFilter  = window._fsImpFilter;
+  const tagFilter  = window._fsTagFilter;
 
   const STATUS_COLOR = {'미회수':'var(--gold)','회수완료':'var(--teal)','삭제됨':'var(--muted)'};
   const STATUS_BG    = {'미회수':'var(--gold-light)','회수완료':'var(--teal-light)','삭제됨':'var(--cream)'};
   const IMP_COLOR    = {'★★★ 핵심':'var(--rust)','★★ 중요':'var(--gold)','★ 일반':'var(--muted)'};
 
-  // 회수율 계산
   const total = list.length;
   const done  = list.filter(f=>f.status==='회수완료').length;
   const pct   = total ? Math.round(done/total*100) : 0;
@@ -7594,12 +7420,20 @@ function renderForeshadow() {
   // 필터링
   let filtered = filter==='전체' ? list : list.filter(f=>f.status===filter);
   if (charFilter!=='전체') filtered = filtered.filter(f=>(f.chars||'').split(',').map(s=>s.trim()).includes(charFilter));
+  if (impFilter!=='전체')  filtered = filtered.filter(f=>(f.importance||'')=== impFilter);
+  if (tagFilter!=='전체')  filtered = filtered.filter(f=>(f.tags||'').split(',').map(s=>s.trim()).includes(tagFilter));
 
-  // 인물 목록 (복선에 등장하는 인물만)
   const usedChars = [...new Set(list.flatMap(f=>(f.chars||'').split(',').map(s=>s.trim()).filter(Boolean)))].sort();
+  const allTags   = [...new Set(list.flatMap(f=>(f.tags||'').split(',').map(s=>s.trim()).filter(Boolean)))].sort();
+  const allImps   = ['★★★ 핵심','★★ 중요','★ 일반'].filter(i=>list.some(f=>f.importance===i));
 
-  // 태그 목록
-  const allTags = [...new Set(list.flatMap(f=>(f.tags||'').split(',').map(s=>s.trim()).filter(Boolean)))].sort();
+  const filterBtn = (label, active, onclick, color='var(--gold)') =>
+    `<button onclick="${onclick}"
+      style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;
+        flex-shrink:0;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;
+        border:1.5px solid ${active?color:'var(--border)'};
+        background:${active?color:'transparent'};
+        color:${active?'#fff':'var(--muted)'}">${label}</button>`;
 
   document.getElementById('main').innerHTML = `
     <div style="max-width:800px;margin:0 auto">
@@ -7624,36 +7458,40 @@ function renderForeshadow() {
       </div>` : ''}
 
       <!-- 상태 필터 -->
-      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">
-        ${['전체','미회수','회수완료','삭제됨'].map(s=>`
-          <button onclick="window._fsFilter='${s}';renderForeshadow()"
-            style="padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;
-              font-family:'Noto Sans KR',sans-serif;transition:all .15s;
-              border:1.5px solid ${filter===s?'var(--gold)':'var(--border)'};
-              background:${filter===s?'var(--gold)':'transparent'};
-              color:${filter===s?'#fff':'var(--muted)'}">
-            ${s} <span style="opacity:.7">(${s==='전체'?total:list.filter(f=>f.status===s).length})</span>
-          </button>`).join('')}
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+        ${['전체','미회수','회수완료','삭제됨'].map(s=>
+          filterBtn(
+            s + ` <span style="opacity:.7">(${s==='전체'?total:list.filter(f=>f.status===s).length})</span>`,
+            filter===s,
+            `window._fsFilter='${s}';renderForeshadow()`
+          )
+        ).join('')}
       </div>
+
+      <!-- 중요도 필터 -->
+      ${allImps.length > 0 ? `
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;align-items:center">
+        <span style="font-size:11px;color:var(--muted);font-weight:600">★</span>
+        ${filterBtn('전체', impFilter==='전체', "window._fsImpFilter='전체';renderForeshadow()", 'var(--rust)')}
+        ${allImps.map(i=>filterBtn(i, impFilter===i, `window._fsImpFilter='${i}';renderForeshadow()`, IMP_COLOR[i]||'var(--rust)')).join('')}
+      </div>` : ''}
+
+      <!-- 태그 필터 -->
+      ${allTags.length > 0 ? `
+      <div style="display:flex;gap:5px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:6px;
+        padding-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none;align-items:center">
+        <span style="font-size:11px;color:var(--muted);font-weight:600;flex-shrink:0">#</span>
+        ${filterBtn('전체', tagFilter==='전체', "window._fsTagFilter='전체';renderForeshadow()", 'var(--teal)')}
+        ${allTags.map(t=>filterBtn('#'+t, tagFilter===t, `window._fsTagFilter='${esc(t)}';renderForeshadow()`, 'var(--teal)')).join('')}
+      </div>` : ''}
 
       <!-- 인물 필터 -->
       ${usedChars.length > 0 ? `
       <div style="display:flex;gap:5px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:14px;
-        padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none">
-        <span style="font-size:11px;color:var(--muted);flex-shrink:0;font-weight:600;line-height:2.2">👤</span>
-        <button onclick="window._fsCharFilter='전체';renderForeshadow()"
-          style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;
-            flex-shrink:0;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;
-            border:1.5px solid ${charFilter==='전체'?'var(--teal)':'var(--border)'};
-            background:${charFilter==='전체'?'var(--teal)':'transparent'};
-            color:${charFilter==='전체'?'#fff':'var(--muted)'}">전체</button>
-        ${usedChars.map(c=>`
-          <button onclick="window._fsCharFilter='${esc(c)}';renderForeshadow()"
-            style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;
-              flex-shrink:0;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;
-              border:1.5px solid ${charFilter===c?'var(--teal)':'var(--border)'};
-              background:${charFilter===c?'var(--teal)':'transparent'};
-              color:${charFilter===c?'#fff':'var(--muted)'}">${esc(c)}</button>`).join('')}
+        padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none;align-items:center">
+        <span style="font-size:11px;color:var(--muted);font-weight:600;flex-shrink:0">👤</span>
+        ${filterBtn('전체', charFilter==='전체', "window._fsCharFilter='전체';renderForeshadow()", 'var(--teal2)')}
+        ${usedChars.map(c=>filterBtn(esc(c), charFilter===c, `window._fsCharFilter='${esc(c)}';renderForeshadow()`, 'var(--teal2)')).join('')}
       </div>` : '<div style="margin-bottom:14px"></div>'}
 
       <!-- 카드 목록 -->
@@ -7664,14 +7502,21 @@ function renderForeshadow() {
           const st  = f.status || '미회수';
           const imp = f.importance || '';
           const tags = (f.tags||'').split(',').map(s=>s.trim()).filter(Boolean);
+          const nextStatus = st==='미회수' ? '회수완료' : st==='회수완료' ? '미회수' : null;
           return `
           <div class="card" style="margin-bottom:12px;border-left:4px solid ${STATUS_COLOR[st]}">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
               <div style="flex:1;min-width:0">
                 <!-- 뱃지 행 -->
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-                  <span style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;
-                    background:${STATUS_BG[st]};color:${STATUS_COLOR[st]}">${st}</span>
+                  <!-- 상태 퀵 토글 -->
+                  <button onclick="foreshadowToggleStatus(${idx})"
+                    title="${nextStatus ? nextStatus+'(으)로 변경' : ''}"
+                    style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;cursor:${nextStatus?'pointer':'default'};
+                      background:${STATUS_BG[st]};color:${STATUS_COLOR[st]};border:none;
+                      font-family:'Noto Sans KR',sans-serif;transition:all .15s">
+                    ${st==='회수완료'?'✅ ':''}${st}
+                  </button>
                   ${imp?`<span style="font-size:11px;font-weight:700;color:${IMP_COLOR[imp]||'var(--muted)'}">${imp}</span>`:''}
                   ${tags.map(t=>`<span style="font-size:11px;padding:1px 8px;border-radius:20px;
                     background:var(--cream);color:var(--muted);font-weight:600">#${esc(t)}</span>`).join('')}
@@ -7679,7 +7524,7 @@ function renderForeshadow() {
                 </div>
                 <!-- 복선 내용 -->
                 <div style="font-size:14px;font-weight:600;margin-bottom:8px;white-space:pre-wrap">${esc(f.content||'')}</div>
-                <!-- 뿌린 화 → 회수 화 연결 -->
+                <!-- 뿌린 화 → 회수 화 -->
                 ${(f.plant||f.harvest) ? `
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
                   background:var(--cream);border-radius:8px;padding:6px 10px;font-size:12px">
@@ -7704,12 +7549,24 @@ function renderForeshadow() {
     </div>`;
 }
 
+function foreshadowToggleStatus(idx) {
+  const p = getProject();
+  const f = p.foreshadows[idx];
+  if (!f) return;
+  if (f.status === '미회수') f.status = '회수완료';
+  else if (f.status === '회수완료') f.status = '미회수';
+  else return;
+  autoSave();
+  renderForeshadow();
+}
+
 function showForeshadowModal(idx) {
   const p = getProject();
   const f = idx !== undefined ? p.foreshadows[idx] : {};
   const chars = p.characters || [];
   const STATUS = ['미회수','회수완료','삭제됨'];
   const IMP = ['','★ 일반','★★ 중요','★★★ 핵심'];
+  const selChars = (f.chars||'').split(',').map(s=>s.trim()).filter(Boolean);
   showModal(`
     <div class="modal-title">${idx !== undefined ? '복선 수정' : '복선 추가'}</div>
     <div class="form-grid">
@@ -7730,22 +7587,13 @@ function showForeshadowModal(idx) {
       <div class="full"><label class="label">관련 인물</label>
         ${chars.length===0
           ? `<input id="fs-chars" value="${esc(f.chars||'')}" placeholder="예: 영희, 철수">`
-          : `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--paper)">
-              ${chars.map(c=>{
-                const sel=(f.chars||'').split(',').map(s=>s.trim()).includes(c.name);
-                return `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;
-                  padding:3px 8px;border-radius:20px;font-size:12px;font-weight:600;
-                  border:1.5px solid ${sel?'var(--gold)':'var(--border)'};
-                  background:${sel?'var(--gold-light)':'transparent'};
-                  color:${sel?'var(--gold)':'var(--muted)'};transition:all .15s">
-                  <input type="checkbox" name="fs-chars-check" value="${esc(c.name)}" ${sel?'checked':''}
-                    style="display:none"
-                    onchange="this.parentElement.style.borderColor=this.checked?'var(--gold)':'var(--border)';
-                      this.parentElement.style.background=this.checked?'var(--gold-light)':'transparent';
-                      this.parentElement.style.color=this.checked?'var(--gold)':'var(--muted)'">
-                  ${esc(c.name)}</label>`;
-              }).join('')}
-            </div>`}
+          : `<select id="fs-chars-select" multiple
+              style="width:100%;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;
+                background:var(--paper);color:var(--ink);font-family:'Noto Sans KR',sans-serif;
+                font-size:13px;min-height:80px">
+              ${chars.map(c=>`<option value="${esc(c.name)}" ${selChars.includes(c.name)?'selected':''}>${esc(c.name)}${c.role?` (${esc(c.role)})`:''}</option>`).join('')}
+            </select>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">Ctrl(또는 Cmd)을 누른 채 클릭하면 여러 명 선택할 수 있어요</div>`}
       </div>
     </div>
     <div class="modal-footer">
@@ -7760,8 +7608,10 @@ function saveForeshadow(idx) {
   if (!content) { toast('복선 내용을 입력해주세요.'); return; }
   const p = getProject();
   if (!p.foreshadows) p.foreshadows = [];
-  const checked = [...document.querySelectorAll('input[name="fs-chars-check"]:checked')].map(el=>el.value).join(', ');
-  const chars = checked || (document.getElementById('fs-chars')?.value||'');
+  const sel = document.getElementById('fs-chars-select');
+  const chars = sel
+    ? [...sel.selectedOptions].map(o=>o.value).join(', ')
+    : (document.getElementById('fs-chars')?.value||'');
   const f = {
     id: idx !== undefined ? p.foreshadows[idx].id : uid(),
     content,
