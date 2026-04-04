@@ -621,7 +621,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 <div id="app">
   <!-- HEADER -->
   <header id="header">
-    <button id="header-title" onclick="goHome()">호필 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.4.3 beta</span></button>
+    <button id="header-title" onclick="goHome()">호필 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.4.4 beta</span></button>
     <button class="header-btn" id="menu-toggle" onclick="toggleSidebar()" style="display:none;padding:6px 8px">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- 왼쪽 세로선 -->
@@ -1331,7 +1331,7 @@ function renderHome() {
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
         <p style="font-size:11px;color:var(--muted);opacity:.6;line-height:1.8">
-          호필 스튜디오 v0.4.3 beta · © 2026 호백<br>
+          호필 스튜디오 v0.4.4 beta · © 2026 호백<br>
           <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
             style="color:var(--muted);text-decoration:none;opacity:.8">CC BY-NC 4.0</a>
           · 비상업적 목적에 한해 자유롭게 사용 가능<br>
@@ -6074,9 +6074,6 @@ function moveCharCard(idx, dir) {
   renderCharacters();
 }
 
-// ═══════════════════════════════════════════════════════════
-// 캐릭터 카드 드래그 앤 드롭 (카테고리 간 이동 포함)
-// ═══════════════════════════════════════════════════════════
 let _cDrag = null;
 
 function initCharDrag() {
@@ -6694,16 +6691,20 @@ function renderFamilyTabs(f, fi) {
 
   const memberRows = members.map((m, mi) => `
     <div class="member-row" data-fi="${fi}" data-mi="${mi}"
-      style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--cream);border-radius:8px;transition:opacity .15s">
+      style="display:flex;align-items:flex-start;gap:8px;padding:6px 10px;background:var(--cream);border-radius:8px;transition:opacity .15s">
       <span class="member-handle" data-fi="${fi}" data-mi="${mi}"
-        style="color:var(--muted);font-size:18px;flex-shrink:0;cursor:grab;padding:4px;touch-action:none;user-select:none">⠿</span>
+        style="color:var(--muted);font-size:18px;flex-shrink:0;cursor:grab;padding:4px;touch-action:none;user-select:none;margin-top:1px">⠿</span>
       <div style="flex:1;min-width:0">
-        <span style="font-weight:600;font-size:13px">${esc(m.name)}</span>
-        ${m.relation?`<span style="font-size:11px;color:var(--muted);margin-left:6px">${esc(m.relation)}</span>`:''}
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-weight:600;font-size:13px">${esc(m.name)}</span>
+          ${m.relation?`<span style="font-size:11px;color:var(--muted)">${esc(m.relation)}</span>`:''}
+        </div>
+        ${m.note?`<div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;word-break:break-all">${esc(m.note)}</div>`:''}
       </div>
-      ${m.note?`<span style="font-size:11px;color:var(--muted);flex-shrink:0">${esc(m.note)}</span>`:''}
-      <button onclick="showEditMemberModal(${fi},${mi})" style="background:none;border:none;cursor:pointer;color:var(--teal);font-size:13px;width:28px;height:28px;flex-shrink:0">✏️</button>
-      <button onclick="deleteFamilyMember(${fi},${mi})" style="background:none;border:none;cursor:pointer;color:var(--rust);font-size:14px;width:28px;height:28px;flex-shrink:0">×</button>
+      <div style="display:flex;flex-shrink:0;gap:0">
+        <button onclick="showEditMemberModal(${fi},${mi})" style="background:none;border:none;cursor:pointer;color:var(--teal);font-size:13px;width:28px;height:28px">✏️</button>
+        <button onclick="deleteFamilyMember(${fi},${mi})" style="background:none;border:none;cursor:pointer;color:var(--rust);font-size:14px;width:28px;height:28px">×</button>
+      </div>
     </div>`).join('');
 
   return `
@@ -8083,8 +8084,9 @@ function renderItemGrid() {
           const idx = items.indexOf(it);
           const rarity = ITEM_RARITIES.find(r=>r.label===it.rarity) || ITEM_RARITIES[0];
           return `
-          <div class="card card-sm" style="padding:0;overflow:hidden;border-top:3px solid ${rarity.color}">
-            <div style="padding:12px 14px;display:flex;gap:12px;align-items:flex-start">
+          <div class="card card-sm" style="padding:0;overflow:hidden;border-top:3px solid ${rarity.color};display:flex;flex-direction:column;cursor:default">
+
+            <div style="padding:12px 14px;flex:1;display:flex;gap:12px;align-items:flex-start">
               <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
                   <span style="font-weight:700;font-size:14px">${esc(it.name)}</span>
@@ -8133,8 +8135,9 @@ function renderGlossaryCards() {
     : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">${
         filtered.map(g => {
           const idx = list.indexOf(g);
-          return `<div class="card card-sm" style="padding:0;overflow:hidden">
-            <div style="padding:12px 14px">
+          return `<div class="card card-sm" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
+
+            <div style="padding:12px 14px;flex:1">
               <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
                 <div>
                   <span style="font-weight:700;font-size:15px">${esc(g.term)}</span>
