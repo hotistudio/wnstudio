@@ -1303,7 +1303,7 @@ function renderHome() {
         <h1>호필 스튜디오</h1>
         <p>아이디어에서 완성작까지 — 당신의 이야기를 완성하세요</p>
         <span style="font-size:12px;color:var(--border);font-family:'Noto Serif KR',serif;letter-spacing:.5px;font-weight:400;display:block;margin-top:6px">제작자 : 호백 with Claude</span>
-        <span style="font-size:11px;color:var(--muted);opacity:.8;display:block;margin-top:8px">✏️ 글은 입력 후 자동저장 · 💾 파일 저장 / Ctrl+S로 JSON 백업 · 앱 재시작 시 파일 재연결 필요</span>
+        <span style="font-size:11px;color:var(--muted);opacity:.8;display:block;margin-top:8px">✏️ 글은 입력 후 자동저장 · Ctrl+S로 기기 저장 · 💾 파일 저장 버튼으로 JSON 백업</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -5839,12 +5839,7 @@ document.addEventListener('keydown', e => {
     if (overlay && overlay.classList.contains('active')) {
       e.preventDefault();
       saveToStorage();
-      const p = getProject();
-      fsSaveToLocal(p || null).then(result => {
-        const name = p ? (p.title || '작품') : '전체';
-        if (result === true) { showSavedBanner(true); toast(name + ' 저장 완료 💾'); }
-        else if (result === false) { showSavedBanner(false); toast('⚠️ 저장 실패. 다시 시도해주세요.'); }
-      });
+      showSavedBanner(true);
     }
   }
 });
@@ -6627,22 +6622,14 @@ window.addEventListener('keydown', e => {
     if (p) {
       saveToStorage();
       setLastBackupTime();
-      fsSaveToLocal(p).then(result => {
-        if (result === true) {
-          showSavedBanner(true);
-          toast((p.title || '작품') + ' 저장 완료 💾');
-          const titleBtn = document.getElementById('header-title');
-          if (titleBtn) {
-            const orig = titleBtn.innerHTML;
-            titleBtn.innerHTML = '✓ 저장됨';
-            titleBtn.style.color = 'var(--gold2)';
-            setTimeout(() => { titleBtn.innerHTML = orig; titleBtn.style.color = ''; }, 1200);
-          }
-        } else if (result === false) {
-          showSavedBanner(false);
-          toast('⚠️ 저장 실패. 다시 시도해주세요.');
-        }
-      });
+      showSavedBanner(true);
+      const titleBtn = document.getElementById('header-title');
+      if (titleBtn) {
+        const orig = titleBtn.innerHTML;
+        titleBtn.innerHTML = '✓ 저장됨';
+        titleBtn.style.color = 'var(--gold2)';
+        setTimeout(() => { titleBtn.innerHTML = orig; titleBtn.style.color = ''; }, 1200);
+      }
     } else {
       toast('저장할 작품을 먼저 열어주세요.');
     }
