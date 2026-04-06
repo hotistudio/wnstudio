@@ -852,32 +852,9 @@ function loadFromStorage() {
 async function exportAllProjects() {
   if (state.projects.length === 0) { toast('저장할 작품이 없어요.'); return; }
   const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
-  if (FS_SUPPORTED) {
-    try {
-      // 이미 핸들이 있으면 바로 덮어쓰기
-      if (fileHandles.all) {
-        const ok = await writeToFileHandle(fileHandles.all, data);
-        if (ok) { toast('전체 저장 완료! ' + state.projects.length + '개 작품 💾'); return; }
-      }
-      // 처음엔 파일 선택 다이얼로그
-      const handle = await window.showSaveFilePicker({
-        suggestedName: '호필스튜디오_전체백업.json',
-        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
-      });
-      fileHandles.all = handle;
-      await writeToFileHandle(handle, data);
-      toast('파일 연결 완료! 이후 자동으로 같은 파일에 저장됩니다 💾');
-      updateFileStatus();
-    } catch(e) {
-      if (e.name !== 'AbortError') {
-        // 폴백: 일반 다운로드
-        _downloadJson(data, '호필스튜디오_전체백업_' + new Date().toISOString().slice(0,10) + '.json');
-      }
-    }
-  } else {
-    _downloadJson(data, '호필스튜디오_전체백업_' + new Date().toISOString().slice(0,10) + '.json');
-    toast('전체 저장 완료! ' + state.projects.length + '개 작품 📦');
-  }
+  const filename = '호필스튜디오_전체백업_' + new Date().toISOString().slice(0,10) + '.json';
+  _downloadJson(data, filename);
+  toast('전체 저장 완료! ' + state.projects.length + '개 작품 💾');
 }
 
 async function exportCurrentProject() {
