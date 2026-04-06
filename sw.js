@@ -1,5 +1,5 @@
-// wnstudio sw.js - updated: 1775479662
-const CACHE = 'wnstudio-1775479662';
+// wnstudio sw.js - updated: 1775480145
+const CACHE = 'wnstudio-1775480145';
 const CORE = ['/wnstudio/', '/wnstudio/index.html'];
 
 self.addEventListener('install', e => {
@@ -8,7 +8,6 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  // 이전 캐시만 삭제, 현재 캐시는 유지
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
@@ -20,7 +19,7 @@ self.addEventListener('activate', e => {
 // 캐시 우선, 백그라운드 갱신 — Safari 재다운로드 창 방지
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  // 네비게이션(페이지 로드) 요청은 캐시만 사용 → 재다운로드 창 방지
+  // 네비게이션(페이지 로드) 요청은 캐시만 사용
   if (e.request.mode === 'navigate') {
     e.respondWith(
       caches.match(e.request).then(cached => cached || fetch(e.request))
