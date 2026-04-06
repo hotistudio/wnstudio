@@ -1,5 +1,5 @@
-// wnstudio sw.js - updated: 1775480145
-const CACHE = 'wnstudio-1775480145';
+// wnstudio sw.js - updated: 1775480896
+const CACHE = 'wnstudio-1775480896';
 const CORE = ['/wnstudio/', '/wnstudio/index.html'];
 
 self.addEventListener('install', e => {
@@ -16,17 +16,14 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// 캐시 우선, 백그라운드 갱신 — Safari 재다운로드 창 방지
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  // 네비게이션(페이지 로드) 요청은 캐시만 사용
   if (e.request.mode === 'navigate') {
     e.respondWith(
       caches.match(e.request).then(cached => cached || fetch(e.request))
     );
     return;
   }
-  // 그 외 리소스: 캐시 우선, 백그라운드 갱신
   e.respondWith(
     caches.open(CACHE).then(cache =>
       cache.match(e.request).then(cached => {
