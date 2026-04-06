@@ -1303,7 +1303,7 @@ function renderHome() {
         <h1>호필 스튜디오</h1>
         <p>아이디어에서 완성작까지 — 당신의 이야기를 완성하세요</p>
         <span style="font-size:12px;color:var(--border);font-family:'Noto Serif KR',serif;letter-spacing:.5px;font-weight:400;display:block;margin-top:6px">제작자 : 호백 with Claude</span>
-        <span style="font-size:11px;color:var(--rust);opacity:.7;display:block;margin-top:8px">💾 저장 버튼으로 파일 연결 시 자동으로 같은 파일에 덮어쓰기 저장됩니다</span>
+        <span style="font-size:11px;color:var(--muted);opacity:.8;display:block;margin-top:8px">✏️ Ctrl+S로 기기에 자동저장 · 💾 파일 저장 버튼으로 JSON 백업 보관</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -5840,11 +5840,9 @@ document.addEventListener('keydown', e => {
       e.preventDefault();
       saveToStorage();
       const p = getProject();
-      fsSaveToLocal(p || null).then(result => {
-        const name = p ? (p.title || '작품') : '전체';
-        if (result === true) { showSavedBanner(true); toast(name + ' 저장 완료 💾'); }
-        else if (result === false) { showSavedBanner(false); toast('⚠️ 저장 실패. 다시 시도해주세요.'); }
-      });
+      const name = p ? (p.title || '작품') : '전체';
+      showSavedBanner(true);
+      toast(name + ' 저장됨 ✓');
     }
   }
 });
@@ -6627,22 +6625,15 @@ window.addEventListener('keydown', e => {
     if (p) {
       saveToStorage();
       setLastBackupTime();
-      fsSaveToLocal(p).then(result => {
-        if (result === true) {
-          showSavedBanner(true);
-          toast((p.title || '작품') + ' 저장 완료 💾');
-          const titleBtn = document.getElementById('header-title');
-          if (titleBtn) {
-            const orig = titleBtn.innerHTML;
-            titleBtn.innerHTML = '✓ 저장됨';
-            titleBtn.style.color = 'var(--gold2)';
-            setTimeout(() => { titleBtn.innerHTML = orig; titleBtn.style.color = ''; }, 1200);
-          }
-        } else if (result === false) {
-          showSavedBanner(false);
-          toast('⚠️ 저장 실패. 다시 시도해주세요.');
-        }
-      });
+      showSavedBanner(true);
+      toast((p.title || '작품') + ' 저장됨 ✓');
+      const titleBtn = document.getElementById('header-title');
+      if (titleBtn) {
+        const orig = titleBtn.innerHTML;
+        titleBtn.innerHTML = '✓ 저장됨';
+        titleBtn.style.color = 'var(--gold2)';
+        setTimeout(() => { titleBtn.innerHTML = orig; titleBtn.style.color = ''; }, 1200);
+      }
     } else {
       toast('저장할 작품을 먼저 열어주세요.');
     }
@@ -7409,8 +7400,8 @@ function renderForeshadow() {
   const impFilter  = window._fsImpFilter;
   const tagFilter  = window._fsTagFilter;
 
-  const STATUS_COLOR = {'미회수':'var(--gold)','회수완료':'var(--teal)','삭제됨':'var(--muted)'};
-  const STATUS_BG    = {'미회수':'var(--gold-light)','회수완료':'var(--teal-light)','삭제됨':'var(--cream)'};
+  const STATUS_COLOR = {'미회수':'var(--gold)','회수완료':'var(--teal)'};
+  const STATUS_BG    = {'미회수':'var(--gold-light)','회수완료':'var(--teal-light)'};
   const IMP_COLOR    = {'★★★ 핵심':'var(--rust)','★★ 중요':'var(--gold)','★ 일반':'var(--muted)'};
 
   const total = list.length;
@@ -7459,7 +7450,7 @@ function renderForeshadow() {
 
       <!-- 상태 필터 -->
       <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">
-        ${['전체','미회수','회수완료','삭제됨'].map(s=>
+        ${['전체','미회수','회수완료'].map(s=>
           filterBtn(
             s + ` <span style="opacity:.7">(${s==='전체'?total:list.filter(f=>f.status===s).length})</span>`,
             filter===s,
@@ -7553,7 +7544,7 @@ function showForeshadowModal(idx) {
   const p = getProject();
   const f = idx !== undefined ? p.foreshadows[idx] : {};
   const chars = p.characters || [];
-  const STATUS = ['미회수','회수완료','삭제됨'];
+  const STATUS = ['미회수','회수완료'];
   const IMP = ['','★ 일반','★★ 중요','★★★ 핵심'];
   const selChars = (f.chars||'').split(',').map(s=>s.trim()).filter(Boolean);
   showModal(`
