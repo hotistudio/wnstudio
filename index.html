@@ -806,7 +806,10 @@ async function writeToFileHandle(handle, data) {
 }
 
 function saveToStorage() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.projects)); } catch(e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.projects)); }
+  catch(e) {
+    toast('⚠️ 저장 실패! 브라우저 저장공간이 부족해요. 일부 작품을 JSON으로 백업 후 삭제해주세요.');
+  }
   // 전체 파일 핸들이 연결되어 있으면 덮어쓰기
   if (fileHandles.all) {
     const data = { projects: state.projects, version: '2.0', savedAt: new Date().toISOString() };
