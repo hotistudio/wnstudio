@@ -5818,8 +5818,7 @@ document.addEventListener('keydown', e => {
     const overlay = document.getElementById('focus-overlay');
     if (overlay && overlay.classList.contains('active')) {
       e.preventDefault();
-      saveToStorage();
-      showSavedBanner(true);
+      exportCurrentProject();
     }
   }
 });
@@ -6600,16 +6599,8 @@ window.addEventListener('keydown', e => {
     e.stopPropagation();
     const p = getProject();
     if (p) {
-      saveToStorage();
-      setLastBackupTime();
-      showSavedBanner(true);
-      const titleBtn = document.getElementById('header-title');
-      if (titleBtn) {
-        const orig = titleBtn.innerHTML;
-        titleBtn.innerHTML = '✓ 저장됨';
-        titleBtn.style.color = 'var(--gold2)';
-        setTimeout(() => { titleBtn.innerHTML = orig; titleBtn.style.color = ''; }, 1200);
-      }
+      // 작품 내 파일 저장 버튼 클릭과 동일하게 동작
+      exportCurrentProject();
     } else {
       toast('저장할 작품을 먼저 열어주세요.');
     }
