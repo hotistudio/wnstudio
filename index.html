@@ -2800,23 +2800,11 @@ function initChDrag() {
 // ═══════════════════════════════════════════════════════════
 // 회차 요약 툴팁 (마우스 호버 + 터치 꾹 누르기)
 // ═══════════════════════════════════════════════════════════
-let _tipTimer = null;
-
 function initSummaryTooltip() {
-  // 기존 이벤트 제거 후 재등록
   document.querySelectorAll('.ch-summary-tip').forEach(el => {
     el.onmouseenter = e => showSummaryTip(el, e.clientX, e.clientY);
     el.onmousemove  = e => moveSummaryTip(e.clientX, e.clientY);
     el.onmouseleave = hideSummaryTip;
-    el.ontouchstart = e => {
-      const t = e.touches[0];
-      _tipTimer = setTimeout(() => showSummaryTip(el, t.clientX, t.clientY), 400);
-    };
-    el.ontouchend = el.ontouchcancel = () => {
-      clearTimeout(_tipTimer);
-      hideSummaryTip();
-    };
-    el.ontouchmove = () => { clearTimeout(_tipTimer); hideSummaryTip(); };
   });
 }
 
