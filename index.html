@@ -2800,23 +2800,26 @@ function initChDrag() {
 // ═══════════════════════════════════════════════════════════
 // 회차 요약 툴팁 (마우스 호버 + 터치 꾹 누르기)
 // ═══════════════════════════════════════════════════════════
+// 실제 마우스 이동 여부 추적
+let _mouseEverMoved = false;
+document.addEventListener('mousemove', () => { _mouseEverMoved = true; }, { once: true });
+
 function initSummaryTooltip() {
   document.querySelectorAll('.ch-summary-tip').forEach(el => {
     el.addEventListener('mouseover', e => {
+      if (!_mouseEverMoved) return;
       showSummaryTip(el, e.clientX, e.clientY);
     });
     el.addEventListener('mousemove', e => {
       moveSummaryTip(e.clientX, e.clientY);
     });
-    el.addEventListener('mouseout', e => {
-      hideSummaryTip();
-    });
+    el.addEventListener('mouseout', () => hideSummaryTip());
     el.addEventListener('click', () => hideSummaryTip());
-    el.addEventListener('touchstart', () => hideSummaryTip(), { passive: true });
   });
-  // 터치/클릭 시 전역으로 툴팁 숨김
-  document.addEventListener('touchstart', () => hideSummaryTip(), { passive: true });
-  document.addEventListener('click', () => hideSummaryTip());
+  document.addEventListener('touchstart', () => {
+    _mouseEverMoved = false;
+    hideSummaryTip();
+  }, { passive: true });
 }
 
 function showSummaryTip(el, cx, cy) {
