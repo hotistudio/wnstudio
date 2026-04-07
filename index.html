@@ -314,6 +314,20 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 .chapter-item-title{font-size:13px;font-weight:600;margin-bottom:3px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chapter-item-meta{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
+/* 회차 요약 툴팁 */
+#ch-summary-tooltip {
+  position:fixed;z-index:99999;
+  background:var(--ink);color:#fff;
+  font-size:12px;line-height:1.7;
+  padding:8px 12px;border-radius:10px;
+  max-width:240px;width:max-content;
+  word-break:break-all;white-space:normal;
+  box-shadow:0 4px 16px rgba(0,0,0,.25);
+  pointer-events:none;
+  opacity:0;transition:opacity .15s;
+  font-family:'Noto Sans KR',sans-serif;
+  font-style:normal;font-weight:400;
+}
 .editor-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .editor-toolbar{padding:10px 16px;border-bottom:1px solid var(--border);background:var(--white);
   display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0}
@@ -2273,9 +2287,10 @@ function renderChapters() {
               touch-action:none;user-select:none;padding:0 2px">⠿</span>
           <div style="flex:1;min-width:0">
             <div class="chapter-item-title">${esc(c.title)}</div>
-            ${c.summary ? `<div style="font-size:10px;color:var(--muted);margin-bottom:2px;
+            ${c.summary ? `<div class="ch-summary-tip" style="font-size:10px;color:var(--muted);margin-bottom:2px;
               overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-              font-style:italic;line-height:1.4">${esc(c.summary)}</div>` : ''}
+              font-style:italic;line-height:1.4;cursor:default"
+              data-summary="${esc(c.summary)}">${esc(c.summary)}</div>` : ''}
             <div class="chapter-item-meta">
               <span>${(c.content||'').length.toLocaleString()}자</span>
               <span class="status-badge s-${esc(c.status)}" style="font-size:10px;padding:1px 6px">${esc(c.status)}</span>
@@ -2339,7 +2354,6 @@ function renderChapters() {
       <!-- 데스크탑 화 목록 -->
       <div class="chapter-list-wrap" id="chapter-list-wrap">
         <div class="chapter-list" id="chapter-list">
-          <div class="chapter-list-header">
             <span style="font-size:12px;font-weight:700;color:var(--muted)">목록</span>
             <div style="display:flex;gap:4px">
               <button class="btn btn-outline btn-sm" onclick="newFolder()" title="폴더 추가"
@@ -2781,7 +2795,72 @@ function initChDrag() {
     h.addEventListener('touchstart', cfTouchStart, {passive: false});
     h.addEventListener('mousedown', cfMouseStart);
   });
+  initSummaryTooltip();
 }
+// ═══════════════════════════════════════════════════════════
+// 회차 요약 툴팁 (마우스 호버 + 터치 꾹 누르기)
+// ═══════════════════════════════════════════════════════════
+let _tipTimer = null;
+
+function initSummaryTooltip() {
+  // 기존 이벤트 제거 후 재등록
+  document.querySelectorAll('.ch-summary-tip').forEach(el => {
+    el.onmouseenter = e => showSummaryTip(el, e.clientX, e.clientY);
+    el.onmousemove  = e => moveSummaryTip(e.clientX, e.clientY);
+    el.onmouseleave = hideSummaryTip;
+    el.ontouchstart = e => {
+      const t = e.touches[0];
+      _tipTimer = setTimeout(() => showSummaryTip(el, t.clientX, t.clientY), 400);
+    };
+    el.ontouchend = el.ontouchcancel = () => {
+      clearTimeout(_tipTimer);
+      hideSummaryTip();
+    };
+    el.ontouchmove = () => { clearTimeout(_tipTimer); hideSummaryTip(); };
+  });
+}
+
+function showSummaryTip(el, cx, cy) {
+  const text = el.dataset.summary;
+  if (!text) return;
+  let tip = document.getElementById('ch-summary-tooltip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.id = 'ch-summary-tooltip';
+    document.body.appendChild(tip);
+  }
+  tip.textContent = text;
+  moveSummaryTip(cx, cy);
+  requestAnimationFrame(() => { tip.style.opacity = '1'; });
+}
+
+function moveSummaryTip(cx, cy) {
+  const tip = document.getElementById('ch-summary-tooltip');
+  if (!tip || tip.style.opacity === '0') return;
+  // 일단 화면 밖에 배치해서 실제 크기 측정
+  tip.style.left = '0px';
+  tip.style.top = '-9999px';
+  tip.style.opacity = '1';
+  const tw = tip.offsetWidth;
+  const th = tip.offsetHeight;
+  const margin = 8;
+  // X: 커서 오른쪽 우선, 화면 넘으면 왼쪽
+  let x = cx + 14;
+  if (x + tw + margin > window.innerWidth) x = cx - tw - 10;
+  if (x < margin) x = margin;
+  // Y: 커서 아래 우선, 화면 넘으면 위
+  let y = cy + 18;
+  if (y + th + margin > window.innerHeight) y = cy - th - 10;
+  if (y < margin) y = margin;
+  tip.style.left = x + 'px';
+  tip.style.top  = y + 'px';
+}
+
+function hideSummaryTip() {
+  const tip = document.getElementById('ch-summary-tooltip');
+  if (tip) tip.style.opacity = '0';
+}
+
 function chTouchStart(e) {
   e.preventDefault();
   chDragInit(e.currentTarget, e.touches[0].clientY);
