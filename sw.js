@@ -1,5 +1,5 @@
-// wnstudio sw.js - updated: 1775537332
-const CACHE = 'wnstudio-1775537332';
+// wnstudio sw.js - updated: 1775543381
+const CACHE = 'wnstudio-1775543381';
 const CORE = ['/wnstudio/', '/wnstudio/index.html'];
 
 self.addEventListener('install', e => {
