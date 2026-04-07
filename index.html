@@ -1283,7 +1283,7 @@ function renderHome() {
         <h1>호필 스튜디오</h1>
         <p>아이디어에서 완성작까지 — 당신의 이야기를 완성하세요</p>
         <span style="font-size:12px;color:var(--border);font-family:'Noto Serif KR',serif;letter-spacing:.5px;font-weight:400;display:block;margin-top:6px">제작자 : 호백 with Claude</span>
-        <span style="font-size:11px;color:var(--muted);opacity:.8;display:block;margin-top:8px">✏️ 글은 입력 후 자동저장 · Ctrl+S로 기기 저장 · 💾 파일 저장 버튼으로 JSON 백업</span>
+        <span style="font-size:11px;color:var(--muted);opacity:.8;display:block;margin-top:8px">✏️ 글은 입력 후 자동저장 · 💾 파일 저장 버튼으로 JSON 백업 · ⚠️ Ctrl+S는 브라우저 페이지 저장 단축키이므로 사용하지 마세요</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
@@ -6585,7 +6585,10 @@ window.addEventListener('keydown', e => {
       toggleFindReplace();
     }
   }
-  // Ctrl+S는 모바일 브라우저에서 페이지 저장으로 가로채여 사용 불가
+  // Ctrl+S 경고 배너 표시
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    showCtrlSWarning();
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
     if (getProject() && state.activeTab === 'chapters') {
       e.preventDefault();
@@ -6594,6 +6597,32 @@ window.addEventListener('keydown', e => {
     }
   }
 }, true);
+
+function showCtrlSWarning() {
+  const existing = document.getElementById('ctrls-warning');
+  if (existing) { existing.remove(); }
+  const banner = document.createElement('div');
+  banner.id = 'ctrls-warning';
+  banner.style.cssText = `
+    position:fixed;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    background:rgba(181,69,27,.95);
+    color:#fff;padding:18px 28px;border-radius:16px;
+    font-size:14px;font-weight:700;
+    font-family:'Noto Sans KR',sans-serif;
+    line-height:1.8;text-align:center;
+    z-index:99999;pointer-events:none;
+    box-shadow:0 8px 32px rgba(0,0,0,.3);
+    opacity:0;transition:opacity .15s;
+  `;
+  banner.innerHTML = '⚠️ Ctrl+S는 브라우저 페이지 저장 단축키예요<br><span style="font-size:12px;font-weight:400;opacity:.85">파일 저장은 💾 파일 저장 버튼을 사용해주세요</span>';
+  document.body.appendChild(banner);
+  requestAnimationFrame(() => { banner.style.opacity = '1'; });
+  setTimeout(() => {
+    banner.style.opacity = '0';
+    setTimeout(() => banner.remove(), 200);
+  }, 2500);
+}
 
 document.addEventListener('keydown', e => {
   // ESC → 모달 닫기
