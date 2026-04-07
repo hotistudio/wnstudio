@@ -5812,16 +5812,7 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// 집중 모드에서도 Ctrl+S
-document.addEventListener('keydown', e => {
-  if ((e.ctrlKey||e.metaKey) && e.key === 's') {
-    const overlay = document.getElementById('focus-overlay');
-    if (overlay && overlay.classList.contains('active')) {
-      e.preventDefault();
-      exportCurrentProject();
-    }
-  }
-});
+
 
 // 폰트 크기 변경 시 집중 모드도 동기화
 const _origChangeFontSize = changeFontSize;
@@ -6594,17 +6585,7 @@ window.addEventListener('keydown', e => {
       toggleFindReplace();
     }
   }
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    e.preventDefault();
-    e.stopPropagation();
-    const p = getProject();
-    if (p) {
-      // 작품 내 파일 저장 버튼 클릭과 동일하게 동작
-      exportCurrentProject();
-    } else {
-      toast('저장할 작품을 먼저 열어주세요.');
-    }
-  }
+  // Ctrl+S는 모바일 브라우저에서 페이지 저장으로 가로채여 사용 불가
   if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
     if (getProject() && state.activeTab === 'chapters') {
       e.preventDefault();
