@@ -1,6 +1,6 @@
 {
-  "name": "웹소설 스튜디오",
-  "short_name": "웹소설 스튜디오",
+  "name": "호필 스튜디오",
+  "short_name": "호필 스튜디오",
   "description": "웹소설 시나리오 정리용 앱",
   "start_url": "/wnstudio/",
   "scope": "/wnstudio/",
