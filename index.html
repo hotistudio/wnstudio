@@ -622,6 +622,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
   .psy-arc-list{flex-direction:row !important}
   .psy-arc-list .arc-col{min-width:200px !important;max-width:200px !important}
   #header-project{display:none}
+  .overview-split{grid-template-columns:1fr !important}
 }
 @media(min-width:769px) and (max-width:1024px){
   :root{--sidebar:200px}
@@ -1502,45 +1503,187 @@ function createProject() {
 function renderOverview() {
   const p = getProject();
   const wordCount = (p.chapters||[]).reduce((a,c) => a+(c.content||'').length, 0);
-  document.getElementById('main').innerHTML = `
-    <div style="max-width:780px;margin:0 auto">
-      <div class="font-display" style="font-size:22px;margin-bottom:22px">작품 개요</div>
-      <div style="display:grid;gap:16px">
 
-        <div class="card">
-          <div class="sec-title">기본 정보</div>
-          <div class="form-grid">
-            <div class="full"><label class="label">작품 제목</label><input id="ov-title" value="${esc(p.title)}" oninput="updateProject('title',this.value)" placeholder="작품 제목"></div>
-            <div><label class="label">장르</label><select id="ov-genre" onchange="updateProject('genre',this.value)">${selOpts(GENRES,p.genre)}</select></div>
-            <div><label class="label">연재 상태</label><select id="ov-status" onchange="updateProject('status',this.value)">${selOpts(STATUSES,p.status)}</select></div>
-            <div class="full"><label class="label">타겟 독자층</label><input value="${esc(p.targetAudience||'')}" oninput="updateProject('targetAudience',this.value)" placeholder="예: 20~30대 여성"></div>
+  // 연재처 목록 렌더
+  const platforms = p.platforms || [];
+  const platformRows = platforms.map((pl, i) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <input value="${esc(pl.name||'')}" placeholder="연재처 이름 (예: 카카오페이지)"
+        oninput="updatePlatform(${i},'name',this.value)"
+        style="flex:1;min-width:0">
+      <input value="${esc(pl.url||'')}" placeholder="URL (선택)"
+        oninput="updatePlatform(${i},'url',this.value)"
+        style="flex:1.4;min-width:0">
+      <button onclick="deletePlatform(${i})"
+        style="flex-shrink:0;width:28px;height:28px;border-radius:50%;
+          background:rgba(181,69,27,.1);border:none;cursor:pointer;
+          color:var(--rust);font-size:16px;font-weight:700;
+          display:flex;align-items:center;justify-content:center">×</button>
+    </div>`).join('');
+
+  document.getElementById('main').innerHTML = `
+    <div style="max-width:1100px;margin:0 auto">
+      <div class="font-display" style="font-size:22px;margin-bottom:22px">작품 개요</div>
+
+      <!-- 통계 -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+        ${(() => {
+          const chapterCount = (p.chapters||[]).filter(c => !c.isFolder).length;
+          const routineDays = (p.routineDays||[]);
+          const dayOrder = ['월','화','수','목','금','토','일'];
+          const routineStr = routineDays.length
+            ? dayOrder.filter(d => routineDays.includes(d)).join('·')
+            : '—';
+          const allStats = (() => { try { return JSON.parse(localStorage.getItem('wnstudio_writing_stats')||'{}'); } catch(e) { return {}; } })();
+          const pStats = allStats[p.id] || {};
+          const todayKey = new Date().toISOString().slice(0,10);
+          const todayCount = pStats[todayKey] || 0;
+          return [
+            {label:'집필 요일', val:routineStr, unit:'', color:'var(--gold)', small: routineDays.length > 4},
+            {label:'연재 화수', val:chapterCount, unit:'', color:'var(--teal2)'},
+            {label:'오늘 집필량', val:todayCount.toLocaleString(), unit:'', color:'var(--gold)'},
+            {label:'총 집필량', val:wordCount.toLocaleString(), unit:'', color:'var(--teal2)'},
+          ].map(s => `
+            <div class="card" style="text-align:center;padding:16px 10px">
+              <div class="font-display" style="font-size:${s.small?'18':'24'}px;color:${s.color};letter-spacing:${s.small?'1':'0'}px">${s.val}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px">${s.label}${s.unit?' <span style="font-size:10px">'+s.unit+'</span>':''}</div>
+            </div>`).join('');
+        })()}
+      </div>
+
+      <!-- 좌우 분할 -->
+      <div class="overview-split" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+
+        <!-- 왼쪽: 작품 개요 -->
+        <div style="display:grid;gap:16px">
+          <div class="card">
+            <div class="sec-title">기본 정보</div>
+            <div class="form-grid">
+              <div class="full"><label class="label">작품 제목</label><input id="ov-title" value="${esc(p.title)}" oninput="updateProject('title',this.value)" placeholder="작품 제목"></div>
+              <div><label class="label">장르</label><select id="ov-genre" onchange="updateProject('genre',this.value)">${selOpts(GENRES,p.genre)}</select></div>
+              <div><label class="label">연재 상태</label><select id="ov-status" onchange="updateProject('status',this.value)">${selOpts(STATUSES,p.status)}</select></div>
+              <div class="full"><label class="label">타겟 독자층</label><input value="${esc(p.targetAudience||'')}" oninput="updateProject('targetAudience',this.value)" placeholder="예: 20~30대 여성"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="sec-title">줄거리</div>
+            <textarea rows="6" oninput="updateProject('synopsis',this.value)" placeholder="작품의 전체 줄거리를 입력하세요...">${esc(p.synopsis||'')}</textarea>
+          </div>
+
+          <div class="card">
+            <div class="sec-title">작가 메모</div>
+            <textarea rows="4" oninput="updateProject('memo',this.value)" placeholder="영감, 참고 자료, 메모를 자유롭게 기록하세요...">${esc(p.memo||'')}</textarea>
           </div>
         </div>
 
-        <div class="card">
-          <div class="sec-title">줄거리</div>
-          <textarea rows="6" oninput="updateProject('synopsis',this.value)" placeholder="작품의 전체 줄거리를 입력하세요...">${esc(p.synopsis||'')}</textarea>
-        </div>
+        <!-- 오른쪽: 루틴 & 연재처 -->
+        <div style="display:grid;gap:16px">
 
-        <div class="card">
-          <div class="sec-title">작가 메모</div>
-          <textarea rows="4" oninput="updateProject('memo',this.value)" placeholder="영감, 참고 자료, 메모를 자유롭게 기록하세요...">${esc(p.memo||'')}</textarea>
-        </div>
+          <div class="card">
+            <div class="sec-title">집필 루틴</div>
+            <div style="display:grid;gap:12px">
+              <div>
+                <label class="label">집필 요일</label>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px" id="ov-days-group">
+                  ${['월','화','수','목','금','토','일'].map(d => {
+                    const days = p.routineDays || [];
+                    const active = days.includes(d);
+                    return `<button type="button"
+                      onclick="toggleRoutineDay('${d}',this)"
+                      style="width:36px;height:36px;border-radius:50%;font-size:13px;font-weight:700;
+                        font-family:'Noto Sans KR',sans-serif;cursor:pointer;border:1.5px solid;
+                        background:${active?'var(--gold)':'transparent'};
+                        color:${active?'#fff':'var(--muted)'};
+                        border-color:${active?'var(--gold)':'var(--border)'};
+                        transition:all .15s">${d}</button>`;
+                  }).join('')}
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div>
+                  <label class="label">집필 시작 시간</label>
+                  <input type="time" value="${esc(p.routineStart||'')}" oninput="updateProject('routineStart',this.value)">
+                </div>
+                <div>
+                  <label class="label">목표 집필 시간</label>
+                  <input value="${esc(p.routineDuration||'')}" placeholder="예: 2시간" oninput="updateProject('routineDuration',this.value)">
+                </div>
+              </div>
+              <div>
+                <label class="label">회차당 목표 분량</label>
+                <input value="${esc(p.routineGoal||'')}" placeholder="예: 6,000자" oninput="updateProject('routineGoal',this.value)">
+              </div>
+              <div>
+                <label class="label">루틴 메모</label>
+                <textarea rows="3" oninput="updateProject('routineMemo',this.value)"
+                  placeholder="루틴 관련 메모, 주의사항 등...">${esc(p.routineMemo||'')}</textarea>
+              </div>
+            </div>
+          </div>
 
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-          ${[
-            {label:'등장인물', val:(p.characters||[]).length, unit:'명'},
-            {label:'세계관 설정', val:(p.worldSettings||[]).length, unit:'개'},
-            {label:'플롯 아크', val:(p.arcs||[]).length, unit:'개'},
-            {label:'총 집필량', val:wordCount.toLocaleString(), unit:'자'},
-          ].map(s => `
-            <div class="card" style="text-align:center;padding:16px 10px">
-              <div class="font-display" style="font-size:24px;color:var(--gold)">${s.val}</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:2px">${s.label} ${s.unit}</div>
-            </div>`).join('')}
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div class="sec-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none">연재처</div>
+              <button class="btn btn-outline btn-sm" onclick="addPlatform()">＋ 추가</button>
+            </div>
+            <div id="ov-platforms">
+              ${platforms.length === 0
+                ? `<div style="font-size:12px;color:var(--muted);text-align:center;padding:16px 0">
+                    연재처를 추가해보세요.
+                  </div>`
+                : platformRows}
+            </div>
+            <div>
+              <label class="label" style="margin-top:12px">연재처 메모</label>
+              <textarea rows="2" oninput="updateProject('platformMemo',this.value)"
+                placeholder="계약 조건, 업로드 규칙, 담당자 등...">${esc(p.platformMemo||'')}</textarea>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>`;
+}
+
+function toggleRoutineDay(day, btn) {
+  const p = getProject();
+  p.routineDays = p.routineDays || [];
+  const idx = p.routineDays.indexOf(day);
+  if (idx === -1) {
+    p.routineDays.push(day);
+    btn.style.background = 'var(--gold)';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'var(--gold)';
+  } else {
+    p.routineDays.splice(idx, 1);
+    btn.style.background = 'transparent';
+    btn.style.color = 'var(--muted)';
+    btn.style.borderColor = 'var(--border)';
+  }
+  autoSave();
+}
+
+function addPlatform() {
+  const p = getProject();
+  p.platforms = p.platforms || [];
+  p.platforms.push({ id: uid(), name: '', url: '' });
+  autoSave();
+  renderOverview();
+}
+
+function updatePlatform(idx, key, val) {
+  const p = getProject();
+  if (!p.platforms || !p.platforms[idx]) return;
+  p.platforms[idx][key] = val;
+  autoSave();
+}
+
+function deletePlatform(idx) {
+  const p = getProject();
+  p.platforms.splice(idx, 1);
+  autoSave();
+  renderOverview();
 }
 
 function updateProject(key, val) {
