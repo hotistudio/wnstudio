@@ -1,0 +1,45 @@
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Node (미래 대비)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# 빌드/임시
+dist/
+build/
+tmp/
+*.tmp
+*.log
+
+# 로컬 백업 파일 (사용자가 실수로 커밋하지 않게)
+*.backup.json
+호필스튜디오_전체백업_*.json
+호필스튜디오_*.json
+웹소설스튜디오_*.json
+
+# 환경 변수
+.env
+.env.local
+
+# 기타
+*.orig
