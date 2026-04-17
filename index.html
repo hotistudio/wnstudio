@@ -629,13 +629,178 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
   .form-grid{grid-template-columns:1fr 1fr}
   #prose-editor{font-size:var(--editor-font-size,16px)}
 }
+
+/* ─── 전체 작품 검색 모달 ─────────────────────────────── */
+.gs-modal{
+  position:fixed;inset:0;z-index:9999;display:flex;
+  align-items:flex-start;justify-content:center;
+  padding:60px 16px 16px;
+  font-family:'Noto Sans KR',sans-serif;
+}
+.gs-backdrop{
+  position:absolute;inset:0;background:rgba(0,0,0,.45);
+  backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+}
+.gs-panel{
+  position:relative;background:var(--paper);color:var(--ink);
+  width:min(760px,100%);max-height:calc(100vh - 80px);
+  border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.35);
+  display:flex;flex-direction:column;overflow:hidden;
+  border:1px solid var(--border);
+}
+.gs-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  background:var(--white);flex-shrink:0;
+}
+.gs-close{
+  background:none;border:none;cursor:pointer;
+  font-size:18px;color:var(--muted);padding:4px 8px;border-radius:6px;
+  transition:all .15s;
+}
+.gs-close:hover{background:var(--border);color:var(--ink)}
+.gs-search-row{
+  display:flex;align-items:center;gap:10px;
+  padding:14px 18px 10px;flex-shrink:0;
+}
+#gs-input{
+  flex:1;padding:10px 14px;font-size:15px;
+  border:1.5px solid var(--border);border-radius:10px;
+  background:var(--paper);color:var(--ink);
+  font-family:'Noto Sans KR',sans-serif;
+  outline:none;transition:border-color .15s;
+}
+#gs-input:focus{border-color:var(--gold)}
+.gs-count{
+  font-size:12px;font-weight:700;color:var(--muted);
+  white-space:nowrap;min-width:60px;text-align:right;
+}
+.gs-options{
+  padding:0 18px 14px;display:flex;flex-direction:column;gap:8px;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.gs-pill-row{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+}
+.gs-pill-label{
+  font-size:11px;font-weight:700;color:var(--muted);
+  letter-spacing:.5px;margin-right:4px;
+  min-width:32px;
+}
+.gs-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 11px;border-radius:20px;
+  font-size:12px;font-weight:600;
+  font-family:'Noto Sans KR',sans-serif;
+  background:transparent;color:var(--muted);
+  border:1.5px solid var(--border);
+  cursor:pointer;white-space:nowrap;
+  transition:all .15s;-webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+.gs-pill:hover{
+  border-color:var(--gold2,var(--gold));
+  color:var(--ink);
+}
+.gs-pill.active{
+  background:var(--gold);color:#fff;
+  border-color:var(--gold);
+}
+.gs-pill.active:hover{
+  background:var(--gold2,var(--gold));
+  border-color:var(--gold2,var(--gold));
+}
+.gs-pill-icon{
+  width:6px;height:6px;border-radius:50%;
+  background:currentColor;opacity:.35;
+  transition:opacity .15s;flex-shrink:0;
+}
+.gs-pill.active .gs-pill-icon{opacity:1;background:#fff}
+.gs-pill-mono{
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:11px;font-weight:700;
+  padding:1px 5px;border-radius:4px;
+  background:var(--cream);color:var(--muted);
+  transition:all .15s;
+}
+.gs-pill.active .gs-pill-mono{
+  background:rgba(255,255,255,.25);color:#fff;
+}
+.gs-results{
+  flex:1;overflow-y:auto;padding:10px 18px 18px;
+  -webkit-overflow-scrolling:touch;
+}
+.gs-empty{
+  text-align:center;color:var(--muted);
+  padding:40px 20px;font-size:13px;
+}
+.gs-group{
+  margin-bottom:14px;border:1px solid var(--border);
+  border-radius:10px;overflow:hidden;background:var(--white);
+}
+.gs-group-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;background:var(--cream);
+  border-bottom:1px solid var(--border);
+}
+.gs-group-title{
+  font-size:13px;font-weight:700;color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  flex:1;min-width:0;
+}
+.gs-folder{
+  color:var(--muted);font-weight:600;font-size:12px;
+}
+.gs-group-count{
+  font-size:11px;font-weight:700;color:var(--teal);
+  background:var(--teal-light,rgba(20,140,120,.12));
+  padding:2px 8px;border-radius:10px;flex-shrink:0;margin-left:8px;
+}
+.gs-group-body{display:flex;flex-direction:column}
+.gs-hit{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:9px 12px;cursor:pointer;
+  border-top:1px solid var(--border);
+  transition:background .12s;
+}
+.gs-hit:first-child{border-top:none}
+.gs-hit:hover{background:var(--cream)}
+.gs-field-tag{
+  font-size:10px;font-weight:700;color:#fff;
+  padding:2px 7px;border-radius:10px;flex-shrink:0;
+  margin-top:1px;letter-spacing:.3px;
+}
+.gs-snippet{
+  font-size:13px;line-height:1.6;color:var(--ink);
+  font-family:'Noto Serif KR',serif;
+  word-break:break-all;flex:1;min-width:0;
+}
+.gs-snippet mark{
+  background:var(--gold);color:var(--ink);
+  padding:0 2px;border-radius:3px;font-weight:700;
+}
+[data-theme="dark"] .gs-snippet mark{
+  background:var(--gold);color:#18120a;
+}
+@media(max-width:640px){
+  .gs-modal{padding:20px 8px 8px}
+  .gs-panel{max-height:calc(100vh - 30px)}
+  .gs-header{padding:12px 14px}
+  .gs-search-row{padding:10px 14px 8px}
+  .gs-options{padding:0 14px 12px;gap:6px}
+  .gs-results{padding:8px 14px 14px}
+  .gs-pill-row{gap:5px}
+  .gs-pill{padding:4px 9px;font-size:11px}
+  .gs-pill-label{min-width:auto;font-size:10px}
+  #gs-input{font-size:14px;padding:9px 12px}
+}
 </style>
 </head>
 <body>
 <div id="app">
   <!-- HEADER -->
   <header id="header">
-    <button id="header-title" onclick="goHome()">호필 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.4.11 beta</span></button>
+    <button id="header-title" onclick="goHome()">호필 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.4.14 beta</span></button>
     <button class="header-btn" id="menu-toggle" onclick="toggleSidebar()" style="display:none;padding:6px 8px">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- 왼쪽 세로선 -->
@@ -650,6 +815,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
     <span id="header-project"></span>
     <div id="header-spacer"></div>
     <div id="header-actions" style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+      <button class="header-btn" onclick="openGlobalSearch()" id="btn-global-search" title="전체 작품 검색 (Ctrl+Shift+F)" style="display:none;font-size:16px;padding:5px 8px">🔎</button>
       <button class="header-btn" onclick="toggleDarkMode()" id="btn-darkmode" title="다크모드 전환" style="font-size:16px;padding:5px 8px">🌙</button>
       <button class="header-btn" onclick="toggleThemePicker()" id="btn-theme" title="테마 색상" style="font-size:16px;padding:5px 8px">🎨</button>
 
@@ -1084,6 +1250,8 @@ function goHome() {
   document.getElementById('header-project').textContent = '';
   document.getElementById('btn-save-project').style.display = 'none';
   document.getElementById('btn-load-project').style.display = 'none';
+  const gsBtn = document.getElementById('btn-global-search');
+  if (gsBtn) gsBtn.style.display = 'none';
   document.getElementById('main').classList.remove('no-pad');
   closeSidebar();
   history.replaceState({screen:'home'}, null);
@@ -1100,6 +1268,8 @@ function openProject(id) {
   document.getElementById('header-project').textContent = p.title || '제목 없음';
   document.getElementById('btn-save-project').style.display = 'inline-flex';
   document.getElementById('btn-load-project').style.display = 'inline-flex';
+  const gsBtn = document.getElementById('btn-global-search');
+  if (gsBtn) gsBtn.style.display = 'inline-flex';
   document.getElementById('sidebar-project-title').textContent = p.title || '제목 없음';
   document.getElementById('sidebar-project-status').innerHTML = statusBadge(p.status);
   updateFileStatus();
@@ -1325,7 +1495,7 @@ function renderHome() {
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
         <p style="font-size:11px;color:var(--muted);opacity:.6;line-height:1.8">
-          호필 스튜디오 v0.4.11 beta · © 2026 호백<br>
+          호필 스튜디오 v0.4.14 beta · © 2026 호백<br>
           <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
             style="color:var(--muted);text-decoration:none;opacity:.8">CC BY-NC 4.0</a>
           · 비상업적 목적에 한해 자유롭게 사용 가능<br>
@@ -2547,7 +2717,7 @@ function renderEditorContent(ch) {
       <!-- 왼쪽: 툴바 + 단축키 + 에디터 -->
       <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
         <div class="editor-toolbar">
-          <input value="${esc(ch.title)}" onchange="updateChapter('${ch.id}','title',this.value)"
+          <input id="chapter-title-input" value="${esc(ch.title)}" onchange="updateChapter('${ch.id}','title',this.value)"
             style="width:160px;font-weight:700;font-size:14px;flex-shrink:0">
           <select onchange="updateChapter('${ch.id}','status',this.value)" style="width:90px;font-size:12px;flex-shrink:0">
             ${selOpts(CH_STATUSES, ch.status||'초안')}
@@ -6809,6 +6979,14 @@ window.addEventListener('keydown', e => {
       toggleFindReplace();
     }
   }
+  // Ctrl+Shift+F 전체 작품 검색
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+    if (getProject()) {
+      e.preventDefault();
+      e.stopPropagation();
+      openGlobalSearch();
+    }
+  }
   // Ctrl+S 경고 배너 표시
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     showCtrlSWarning();
@@ -7587,6 +7765,313 @@ const ITEM_RARITIES = [
 // ═══════════════════════════════════════════════════════════
 // 복선 관리
 // ═══════════════════════════════════════════════════════════
+
+// ─── 복선 태그 스캐너 ────────────────────────────────────────
+// 본문에서 [[복선:이름]] 패턴을 찾아 인덱스를 만듦.
+// 이름에는 공백·한글 허용, `]]` 만 제외.
+const FORESHADOW_TAG_RE = /\[\[복선:([^\]\n]+?)\]\]/g;
+
+// 결과: { byName: {name:{chapters:[chId], positions:[{chId,pos,len,before,after}]}},
+//        byChapter: {chId:[name...]} }
+// 캐시 안 함 — 호출할 때마다 새로 스캔 (작가 스타일상 200화 × 5000자도 <50ms).
+function buildForeshadowIndex() {
+  const p = getProject();
+  const chapters = (p?.chapters) || [];
+  const byName = {};
+  const byChapter = {};
+  chapters.forEach(ch => {
+    const text = ch.content || '';
+    if (!text) { byChapter[ch.id] = []; return; }
+    const seenInCh = new Set();
+    FORESHADOW_TAG_RE.lastIndex = 0;
+    let m;
+    while ((m = FORESHADOW_TAG_RE.exec(text)) !== null) {
+      const name = m[1].trim();
+      if (!name) continue;
+      if (!byName[name]) byName[name] = { chapters: [], positions: [] };
+      if (!seenInCh.has(name)) {
+        byName[name].chapters.push(ch.id);
+        seenInCh.add(name);
+      }
+      const pos = m.index, len = m[0].length;
+      const ctxB = 24, ctxA = 32;
+      byName[name].positions.push({
+        chId: ch.id,
+        pos, len,
+        before: (pos > ctxB ? '…' : '') + text.substring(Math.max(0,pos-ctxB), pos),
+        tag: m[0],
+        after: text.substring(pos+len, Math.min(text.length, pos+len+ctxA)) + (pos+len+ctxA < text.length ? '…' : ''),
+      });
+    }
+    byChapter[ch.id] = [...seenInCh];
+  });
+  return { byName, byChapter };
+}
+
+// 해당 복선의 심기/회수/언급 화 분류.
+// 심기 = 첫 등장 화, 회수 = 마지막 등장 화 (복선 status=='회수완료'일 때만),
+// 언급 = 그 사이 중간 등장 화들.
+function classifyForeshadowChapters(foreshadow, index) {
+  const tagName = (foreshadow?.tagName || '').trim();
+  if (!tagName) return { planted: null, harvested: null, mentioned: [], linked: false, tagName: '' };
+  const entry = index.byName[tagName];
+  if (!entry || entry.chapters.length === 0) {
+    return { planted: null, harvested: null, mentioned: [], linked: false, tagName };
+  }
+  const chIds = entry.chapters;
+  const planted = chIds[0];
+  let harvested = null;
+  let mentioned = chIds.slice(1);
+  if (foreshadow.status === '회수완료' && chIds.length >= 2) {
+    harvested = chIds[chIds.length - 1];
+    mentioned = chIds.slice(1, -1);
+  }
+  return { planted, harvested, mentioned, linked: true, tagName };
+}
+
+// 화 ID → 사람이 보기 좋은 라벨.
+// 제목이 이미 번호형(1화 / 1. / 1장 / 프롤로그 / 에필로그 등)이면 제목만,
+// 그렇지 않으면 "N화: 제목" 형식.
+function chapterLabel(chId) {
+  const p = getProject();
+  if (!p) return '?';
+  const chapters = p.chapters || [];
+  const idx = chapters.findIndex(c => c.id === chId);
+  if (idx < 0) return '?';
+  const ch = chapters[idx];
+  const title = (ch.title || '').trim();
+  if (!title) return `${idx + 1}화`;
+  // 번호·회차성 제목이면 그대로
+  // 예: "1화", "1 화", "1장", "1부", "1회", "1편", "1. 제목", "제1화", "프롤로그", "에필로그", "번외", "외전"
+  const isNumeric = /^(제\s*)?\d+\s*(화|장|부|회|편|\.)/.test(title)
+                  || /^(프롤로그|에필로그|번외|외전|서장|종장|막간)/.test(title);
+  if (isNumeric) return title;
+  return `${idx + 1}화: ${title}`;
+}
+
+// ─── 에디터 내 [[복선: 자동완성 ─────────────────────────────
+// prose-editor 에서 키 입력 시 커서 앞을 보고, "[[복선:" 뒤 쿼리가 있으면
+// 기존 복선의 tagName 중 매칭되는 것을 드롭다운으로 보여줌.
+const FSAC = {
+  open: false,
+  items: [],
+  sel: 0,
+  triggerStart: -1, // "[[" 시작 위치
+  queryStart: -1,   // ":" 뒤 쿼리 시작
+};
+
+function fsAcCheck() {
+  const ta = document.getElementById('prose-editor');
+  if (!ta || document.activeElement !== ta) { fsAcClose(); return; }
+  const pos = ta.selectionStart;
+  const text = ta.value;
+  // 커서 앞 최대 40자 조사 — 닫힘(]]) 전까지만
+  const back = text.substring(Math.max(0, pos - 40), pos);
+  const m = /\[\[복선:([^\]\n]*)$/.exec(back);
+  if (!m) { fsAcClose(); return; }
+  const triggerStart = pos - m[0].length;
+  const queryStart = triggerStart + 5; // "[[복선:" = 5 chars... 실제로는 [[복선: = 5 글자
+  // 문자열 길이 계산: [[ + 복선 + : = 2+2+1 = 5
+  const query = m[1];
+  // 후보 수집
+  const p = getProject();
+  const pool = (p?.foreshadows || [])
+    .map(f => ({ name: (f.tagName||'').trim(), content: (f.content||'').slice(0, 50), status: f.status || '미회수' }))
+    .filter(x => x.name);
+  // 중복 제거
+  const seen = new Set();
+  const unique = [];
+  for (const x of pool) {
+    if (seen.has(x.name)) continue;
+    seen.add(x.name); unique.push(x);
+  }
+  const q = query.toLowerCase();
+  let items = q ? unique.filter(x => x.name.toLowerCase().includes(q)) : unique;
+  // 신규 생성 옵션
+  const exact = unique.some(x => x.name === query);
+  if (query && !exact) {
+    items = [{ name: query, content: '(새로 만들기)', isNew: true }, ...items];
+  }
+  items = items.slice(0, 8);
+  if (items.length === 0) { fsAcClose(); return; }
+  FSAC.open = true;
+  FSAC.items = items;
+  FSAC.sel = Math.min(FSAC.sel, items.length - 1);
+  if (FSAC.sel < 0) FSAC.sel = 0;
+  FSAC.triggerStart = triggerStart;
+  FSAC.queryStart = queryStart;
+  fsAcRender(ta);
+}
+
+function fsAcRender(ta) {
+  let dd = document.getElementById('fs-ac-dd');
+  if (!dd) {
+    dd = document.createElement('div');
+    dd.id = 'fs-ac-dd';
+    dd.style.cssText = `position:absolute;z-index:9000;background:var(--paper);border:1px solid var(--border);
+      border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:4px;font-family:'Noto Sans KR',sans-serif;
+      min-width:240px;max-width:360px;max-height:320px;overflow-y:auto`;
+    document.body.appendChild(dd);
+  }
+  // 위치: textarea 내 커서 추정. 단순하게 textarea 박스 기준 아래에 띄움.
+  // 정확한 커서 좌표는 textarea에선 어렵기 때문에 mirror div 기법 사용.
+  const rect = fsAcCaretRect(ta);
+  dd.style.left = rect.left + 'px';
+  dd.style.top = rect.top + 'px';
+  dd.innerHTML = FSAC.items.map((it, i) => `
+    <div class="fs-ac-item ${i===FSAC.sel?'sel':''}" data-i="${i}"
+      style="padding:7px 10px;border-radius:7px;cursor:pointer;display:flex;flex-direction:column;gap:2px;
+        background:${i===FSAC.sel?'var(--gold-light)':'transparent'}">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-weight:700;font-size:13px;color:${it.isNew?'var(--teal)':'var(--ink)'}">${it.isNew?'+ ':''}${esc(it.name)}</span>
+        ${!it.isNew && it.status ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;background:${it.status==='회수완료'?'var(--teal-light)':'var(--gold-light)'};color:${it.status==='회수완료'?'var(--teal)':'var(--gold)'}">${it.status==='회수완료'?'✅':'⏳'}</span>` : ''}
+      </div>
+      ${it.content ? `<div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.content)}</div>` : ''}
+    </div>
+  `).join('');
+  dd.querySelectorAll('.fs-ac-item').forEach(el => {
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // textarea blur 방지
+      FSAC.sel = parseInt(el.dataset.i, 10);
+      fsAcAccept();
+    });
+    el.addEventListener('mouseenter', () => {
+      FSAC.sel = parseInt(el.dataset.i, 10);
+      [...dd.querySelectorAll('.fs-ac-item')].forEach((x, i) => {
+        x.style.background = i === FSAC.sel ? 'var(--gold-light)' : 'transparent';
+      });
+    });
+  });
+}
+
+// textarea 커서 좌표 추정 (mirror div 기법)
+function fsAcCaretRect(ta) {
+  const rect = ta.getBoundingClientRect();
+  const mirror = document.createElement('div');
+  const cs = getComputedStyle(ta);
+  const props = ['boxSizing','width','height','overflowX','overflowY','borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth','paddingTop','paddingRight','paddingBottom','paddingLeft','fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','whiteSpace','wordBreak','wordWrap'];
+  props.forEach(p => { mirror.style[p] = cs[p]; });
+  mirror.style.position = 'absolute';
+  mirror.style.visibility = 'hidden';
+  mirror.style.top = '0';
+  mirror.style.left = '-9999px';
+  mirror.style.whiteSpace = 'pre-wrap';
+  mirror.style.wordWrap = 'break-word';
+  document.body.appendChild(mirror);
+  const before = ta.value.substring(0, ta.selectionStart);
+  mirror.textContent = before;
+  const span = document.createElement('span');
+  span.textContent = '\u200b';
+  mirror.appendChild(span);
+  const spanRect = span.getBoundingClientRect();
+  const mRect = mirror.getBoundingClientRect();
+  const x = rect.left + (spanRect.left - mRect.left) - ta.scrollLeft;
+  const y = rect.top + (spanRect.top - mRect.top) - ta.scrollTop + (parseInt(cs.lineHeight,10) || 22);
+  mirror.remove();
+  // 화면 바깥 방지
+  const ddW = 260;
+  const left = Math.min(x + window.scrollX, window.innerWidth - ddW - 10);
+  const top = y + window.scrollY;
+  return { left, top };
+}
+
+function fsAcClose() {
+  FSAC.open = false;
+  FSAC.items = [];
+  FSAC.sel = 0;
+  const dd = document.getElementById('fs-ac-dd');
+  if (dd) dd.remove();
+}
+
+function fsAcAccept() {
+  if (!FSAC.open) return;
+  const ta = document.getElementById('prose-editor');
+  if (!ta) return;
+  const it = FSAC.items[FSAC.sel];
+  if (!it) return;
+  const pos = ta.selectionStart;
+  const before = ta.value.substring(0, FSAC.triggerStart);
+  const after = ta.value.substring(pos);
+  const tag = `[[복선:${it.name}]]`;
+  const newVal = before + tag + after;
+  // execCommand로 넣어 undo 스택 유지 (기존 패턴 따라감)
+  const selEnd = ta.selectionEnd;
+  ta.focus();
+  ta.setSelectionRange(FSAC.triggerStart, selEnd);
+  const ok = document.execCommand && document.execCommand('insertText', false, tag);
+  if (!ok) {
+    // 폴백
+    ta.value = newVal;
+    const newPos = FSAC.triggerStart + tag.length;
+    ta.setSelectionRange(newPos, newPos);
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  fsAcClose();
+  // 신규 생성 옵션이었다면 해당 이름으로 복선 빠르게 추가
+  if (it.isNew) {
+    const p = getProject();
+    if (!p.foreshadows) p.foreshadows = [];
+    p.foreshadows.push({
+      id: uid(),
+      content: '(에디터에서 생성됨) ' + it.name,
+      tagName: it.name,
+      status: '미회수',
+      importance: '',
+    });
+    autoSave();
+    toast(`복선 "${it.name}" 추가됨. 복선 관리에서 내용을 채워주세요.`);
+  }
+}
+
+function fsAcKeydown(e) {
+  if (!FSAC.open) return false;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    FSAC.sel = (FSAC.sel + 1) % FSAC.items.length;
+    const ta = document.getElementById('prose-editor');
+    if (ta) fsAcRender(ta);
+    return true;
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    FSAC.sel = (FSAC.sel - 1 + FSAC.items.length) % FSAC.items.length;
+    const ta = document.getElementById('prose-editor');
+    if (ta) fsAcRender(ta);
+    return true;
+  }
+  if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault();
+    fsAcAccept();
+    return true;
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    fsAcClose();
+    return true;
+  }
+  return false;
+}
+
+// 에디터에 이벤트 위임으로 autocomplete 연결
+document.addEventListener('input', (e) => {
+  if (e.target && e.target.id === 'prose-editor') {
+    setTimeout(fsAcCheck, 0);
+  }
+}, true);
+document.addEventListener('keydown', (e) => {
+  if (e.target && e.target.id === 'prose-editor') {
+    if (fsAcKeydown(e)) return;
+  }
+}, true);
+document.addEventListener('click', (e) => {
+  if (!e.target.closest || !e.target.closest('#fs-ac-dd')) {
+    if (FSAC.open) fsAcClose();
+  }
+}, true);
+document.addEventListener('scroll', () => {
+  if (FSAC.open) fsAcClose();
+}, true);
+
 function renderForeshadow() {
   const p = getProject();
   if (!p) return;
@@ -7616,6 +8101,9 @@ function renderForeshadow() {
 
   const usedChars = [...new Set(list.flatMap(f=>(f.chars||'').split(',').map(s=>s.trim()).filter(Boolean)))].sort();
   const allImps   = ['★★★ 핵심','★★ 중요','★ 일반'].filter(i=>list.some(f=>f.importance===i));
+
+  // 본문 태그 스캔 (한 번만)
+  const fsIndex = buildForeshadowIndex();
 
   const filterBtn = (label, active, onclick, color='var(--gold)') =>
     `<button onclick="${onclick}"
@@ -7684,6 +8172,14 @@ function renderForeshadow() {
           const imp = f.importance || '';
           const tags = (f.tags||'').split(',').map(s=>s.trim()).filter(Boolean);
           const nextStatus = st==='미회수' ? '회수완료' : st==='회수완료' ? '미회수' : null;
+          const cls = classifyForeshadowChapters(f, fsIndex);
+          const autoPlant = cls.linked ? chapterLabel(cls.planted) : null;
+          const autoHarvest = cls.linked && cls.harvested ? chapterLabel(cls.harvested) : null;
+          const mentionCount = cls.linked ? cls.mentioned.length : 0;
+          // 자동 vs 수동 우선 표시 결정
+          const showPlant = autoPlant || f.plant || '';
+          const showHarvest = autoHarvest || f.harvest || (st==='미회수'?'미회수':'');
+          const hasRow = cls.linked || f.plant || f.harvest;
           return `
           <div class="card" style="margin-bottom:12px;border-left:4px solid ${STATUS_COLOR[st]}">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
@@ -7702,19 +8198,38 @@ function renderForeshadow() {
                   ${tags.map(t=>`<span style="font-size:11px;padding:1px 8px;border-radius:20px;
                     background:var(--cream);color:var(--muted);font-weight:600">#${esc(t)}</span>`).join('')}
                   ${f.chars?`<span style="font-size:11px;color:var(--muted)">👤 ${esc(f.chars)}</span>`:''}
+                  ${cls.linked?`<span title="본문 태그 [[복선:${esc(cls.tagName)}]]와 연결됨" style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:var(--teal-light);color:var(--teal);font-family:'Noto Sans KR',sans-serif">🔗 연결됨</span>`:''}
                 </div>
                 <!-- 복선 내용 -->
                 <div style="font-size:14px;font-weight:600;margin-bottom:8px;white-space:pre-wrap">${esc(f.content||'')}</div>
-                <!-- 뿌린 화 → 회수 화 -->
-                ${(f.plant||f.harvest) ? `
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                <!-- 뿌린 화 → 회수 화 (자동 연결 우선) -->
+                ${hasRow ? `
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;
                   background:var(--cream);border-radius:8px;padding:6px 10px;font-size:12px">
                   <span style="color:var(--muted)">🌱</span>
-                  <span style="font-weight:600;color:var(--ink)">${esc(f.plant||'?')}</span>
+                  ${autoPlant
+                    ? `<button onclick="foreshadowJumpTo(${idx}, 'first')" style="background:none;border:none;cursor:pointer;padding:0;font-weight:600;color:var(--teal);font-family:'Noto Sans KR',sans-serif;text-decoration:underline;text-decoration-color:rgba(20,140,120,.3);text-underline-offset:3px">${esc(autoPlant)}</button>`
+                    : `<span style="font-weight:600;color:var(--ink)">${esc(showPlant||'?')}</span>`
+                  }
                   <span style="color:var(--border);font-size:16px">→→→</span>
-                  <span style="font-weight:600;color:${st==='회수완료'?'var(--teal)':'var(--ink)'}">${esc(f.harvest||(st==='미회수'?'미회수':'?'))}</span>
+                  ${autoHarvest
+                    ? `<button onclick="foreshadowJumpTo(${idx}, 'last')" style="background:none;border:none;cursor:pointer;padding:0;font-weight:600;color:var(--teal);font-family:'Noto Sans KR',sans-serif;text-decoration:underline;text-decoration-color:rgba(20,140,120,.3);text-underline-offset:3px">${esc(autoHarvest)}</button>`
+                    : `<span style="font-weight:600;color:${st==='회수완료'?'var(--teal)':'var(--ink)'}">${esc(showHarvest||'?')}</span>`
+                  }
                   ${st==='회수완료'?'<span style="color:var(--teal)">✅</span>':''}
+                  ${mentionCount > 0 ? `<button onclick="foreshadowToggleMentions(${idx})" style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:12px;padding:2px 9px;cursor:pointer;font-size:11px;font-weight:600;color:var(--muted);font-family:'Noto Sans KR',sans-serif" title="중간 언급된 화 보기">💬 언급 ${mentionCount}</button>` : ''}
+                </div>
+                ${mentionCount > 0 && window._fsExpandMentions === f.id ? `
+                <div style="margin-bottom:8px;padding:8px 12px;background:var(--paper);border:1px dashed var(--border);border-radius:8px;font-size:12px">
+                  <div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:4px;letter-spacing:.5px">중간 언급된 화</div>
+                  ${cls.mentioned.map((cid, mi) => `
+                    <div style="display:flex;align-items:center;gap:6px;padding:3px 0">
+                      <span style="color:var(--muted);font-size:10px">•</span>
+                      <button onclick="foreshadowJumpTo(${idx}, 'mention', ${mi})" style="background:none;border:none;cursor:pointer;padding:0;color:var(--ink);font-family:'Noto Sans KR',sans-serif;text-align:left;font-size:12px">${esc(chapterLabel(cid))}</button>
+                    </div>
+                  `).join('')}
                 </div>` : ''}
+                ` : ''}
                 <!-- 힌트/메모 -->
                 ${f.hint?`<div style="font-size:12px;color:var(--muted);font-style:italic;
                   border-left:3px solid var(--border);padding-left:8px;white-space:pre-wrap">💡 ${esc(f.hint)}</div>`:''}
@@ -7728,6 +8243,60 @@ function renderForeshadow() {
             </div>
           </div>`;}).join('')}
     </div>`;
+}
+
+// 복선 카드 → 본문의 해당 태그 위치로 이동
+// kind: 'first' = 첫 등장(심기), 'last' = 마지막 등장(회수), 'mention' = 중간 언급 n번째
+function foreshadowJumpTo(idx, kind, mentionIdx) {
+  const p = getProject();
+  const f = p?.foreshadows?.[idx];
+  if (!f || !f.tagName) return;
+  const fsIndex = buildForeshadowIndex();
+  const entry = fsIndex.byName[f.tagName.trim()];
+  if (!entry || entry.positions.length === 0) {
+    toast('본문에서 태그를 찾을 수 없어요.');
+    return;
+  }
+  // 화별로 첫 등장 위치 맵 만들기
+  const byCh = {};
+  entry.positions.forEach(pos => {
+    if (!byCh[pos.chId]) byCh[pos.chId] = pos;
+  });
+  let target = null;
+  if (kind === 'first') {
+    target = byCh[entry.chapters[0]];
+  } else if (kind === 'last') {
+    target = byCh[entry.chapters[entry.chapters.length - 1]];
+  } else if (kind === 'mention' && typeof mentionIdx === 'number') {
+    // 중간 언급 = 첫 화·마지막 화 제외 (회수완료일 때만 마지막 제외)
+    const middle = f.status === '회수완료' && entry.chapters.length >= 2
+      ? entry.chapters.slice(1, -1)
+      : entry.chapters.slice(1);
+    const cid = middle[mentionIdx];
+    if (cid) target = byCh[cid];
+  }
+  if (!target) { toast('위치를 찾을 수 없어요.'); return; }
+  activeChapterId = target.chId;
+  navigate('chapters');
+  setTimeout(() => {
+    const ta = document.getElementById('prose-editor');
+    if (ta) {
+      ta.focus();
+      try { ta.setSelectionRange(target.pos, target.pos + target.len); } catch(e) {}
+      const lineHeight = parseInt(getComputedStyle(ta).lineHeight) || 24;
+      const lines = (ta.value || '').substring(0, target.pos).split('\n').length;
+      ta.scrollTop = Math.max(0, (lines - 3) * lineHeight);
+    }
+  }, 120);
+}
+
+function foreshadowToggleMentions(idx) {
+  const p = getProject();
+  const f = p?.foreshadows?.[idx];
+  if (!f) return;
+  if (window._fsExpandMentions === f.id) window._fsExpandMentions = null;
+  else window._fsExpandMentions = f.id;
+  renderForeshadow();
 }
 
 function foreshadowToggleStatus(idx) {
@@ -7748,14 +8317,29 @@ function showForeshadowModal(idx) {
   const STATUS = ['미회수','회수완료'];
   const IMP = ['','★ 일반','★★ 중요','★★★ 핵심'];
   const selChars = (f.chars||'').split(',').map(s=>s.trim()).filter(Boolean);
+  // 기존 복선 인덱스 (자동 계산 정보용)
+  const fsIndex = buildForeshadowIndex();
+  const cls = classifyForeshadowChapters(f, fsIndex);
+  const isLinked = cls.linked;
+  const linkHint = isLinked
+    ? `<span style="color:var(--teal);font-weight:700">🔗 본문 연결됨</span> · ${cls.planted ? '심기: '+esc(chapterLabel(cls.planted)) : ''}${cls.harvested ? ' · 회수: '+esc(chapterLabel(cls.harvested)) : ''}`
+    : (f.tagName ? `<span style="color:var(--muted)">본문에 <code>[[복선:${esc(f.tagName)}]]</code> 태그가 아직 없어요</span>` : '');
+
   showModal(`
     <div class="modal-title">${idx !== undefined ? '복선 수정' : '복선 추가'}</div>
     <div class="form-grid">
       <div class="full"><label class="label">복선 내용 *</label>
         <textarea id="fs-content" rows="3" placeholder="어떤 복선인지 적어주세요">${esc(f.content||'')}</textarea></div>
-      <div><label class="label">뿌린 화/장면</label>
+      <div class="full">
+        <label class="label">태그 이름
+          <span style="font-size:11px;color:var(--muted);font-weight:500">— 본문에 <code style="background:var(--cream);padding:1px 5px;border-radius:3px">[[복선:이름]]</code>으로 심으면 자동 추적</span>
+        </label>
+        <input id="fs-tagname" value="${esc(f.tagName||'')}" placeholder="예: 검의 정체, 왕의 비밀" autocomplete="off">
+        <div id="fs-tag-status" style="font-size:11px;margin-top:5px;min-height:14px">${linkHint}</div>
+      </div>
+      <div><label class="label">뿌린 화/장면 <span style="font-size:10px;color:var(--muted)">(수동 입력)</span></label>
         <input id="fs-plant" value="${esc(f.plant||'')}" placeholder="예: 3화, 1부 2장"></div>
-      <div><label class="label">회수 화/장면</label>
+      <div><label class="label">회수 화/장면 <span style="font-size:10px;color:var(--muted)">(수동 입력)</span></label>
         <input id="fs-harvest" value="${esc(f.harvest||'')}" placeholder="예: 15화"></div>
       <div><label class="label">상태</label>
         <select id="fs-status">${STATUS.map(s=>`<option value="${s}" ${(f.status||'미회수')===s?'selected':''}>${s}</option>`).join('')}</select></div>
@@ -7782,6 +8366,24 @@ function showForeshadowModal(idx) {
       <button class="btn btn-gold" onclick="saveForeshadow(${idx})">저장</button>
     </div>`);
   setTimeout(()=>document.getElementById('fs-content')?.focus(),100);
+
+  // 태그 이름 입력 시 실시간 상태 표시
+  const tagIn = document.getElementById('fs-tagname');
+  const statusEl = document.getElementById('fs-tag-status');
+  if (tagIn && statusEl) {
+    tagIn.addEventListener('input', () => {
+      const name = tagIn.value.trim();
+      if (!name) { statusEl.innerHTML = ''; return; }
+      const entry = fsIndex.byName[name];
+      if (!entry || entry.chapters.length === 0) {
+        statusEl.innerHTML = `<span style="color:var(--muted)">본문에 <code style="background:var(--cream);padding:1px 5px;border-radius:3px">[[복선:${esc(name)}]]</code> 태그가 아직 없어요</span>`;
+      } else {
+        const first = entry.chapters[0];
+        const last = entry.chapters[entry.chapters.length-1];
+        statusEl.innerHTML = `<span style="color:var(--teal);font-weight:700">🔗 본문에서 ${entry.chapters.length}개 화에 발견</span> · 첫 등장: ${esc(chapterLabel(first))}${entry.chapters.length > 1 ? ' · 마지막: '+esc(chapterLabel(last)) : ''}`;
+      }
+    });
+  }
 }
 
 function saveForeshadow(idx) {
@@ -7793,9 +8395,12 @@ function saveForeshadow(idx) {
   const chars = sel
     ? [...sel.selectedOptions].map(o=>o.value).join(', ')
     : (document.getElementById('fs-chars')?.value||'');
+  const tagName = (document.getElementById('fs-tagname')?.value||'').trim();
+  const oldTagName = (idx !== undefined ? (p.foreshadows[idx].tagName || '') : '').trim();
   const f = {
     id: idx !== undefined ? p.foreshadows[idx].id : uid(),
     content,
+    tagName,
     plant:      document.getElementById('fs-plant').value,
     harvest:    document.getElementById('fs-harvest').value,
     status:     document.getElementById('fs-status').value,
@@ -7804,9 +8409,98 @@ function saveForeshadow(idx) {
     hint:       document.getElementById('fs-hint').value,
     chars
   };
+
+  // 태그 이름이 변경된 경우 본문의 [[복선:기존이름]]을 [[복선:새이름]]으로 일괄 치환 제안
+  const nameChanged = oldTagName && tagName && oldTagName !== tagName;
+  const nameRemoved = oldTagName && !tagName;
+  if (nameChanged || nameRemoved) {
+    // 기존 이름이 본문에 몇 번 있는지 세기
+    const idxScan = buildForeshadowIndex();
+    const entry = idxScan.byName[oldTagName];
+    const count = entry ? entry.positions.length : 0;
+    if (count > 0) {
+      const title = nameChanged ? '태그 이름을 변경할까요?' : '태그를 본문에서도 제거할까요?';
+      const msg = nameChanged
+        ? `본문의 <code style="background:var(--cream);padding:1px 5px;border-radius:3px">[[복선:${esc(oldTagName)}]]</code> 태그 ${count}개를 <code style="background:var(--cream);padding:1px 5px;border-radius:3px">[[복선:${esc(tagName)}]]</code>(으)로 일괄 변경합니다.`
+        : `본문의 <code style="background:var(--cream);padding:1px 5px;border-radius:3px">[[복선:${esc(oldTagName)}]]</code> 태그 ${count}개를 모두 제거합니다.`;
+      askDialog({
+        icon: nameChanged ? '✏️' : '🗑️',
+        title,
+        message: msg,
+        okLabel: nameChanged ? '일괄 변경' : '모두 제거',
+        okColor: nameChanged ? 'var(--gold)' : 'var(--rust)',
+        onOk: () => {
+          renameForeshadowTagInContent(oldTagName, nameChanged ? tagName : null);
+          if (idx !== undefined) p.foreshadows[idx] = f;
+          else p.foreshadows.push(f);
+          autoSave(); closeModal(); renderForeshadow();
+        },
+        onCancel: () => {
+          // 본문은 그대로 두되 복선 데이터는 저장
+          if (idx !== undefined) p.foreshadows[idx] = f;
+          else p.foreshadows.push(f);
+          autoSave(); closeModal(); renderForeshadow();
+        },
+        cancelLabel: '본문은 그대로',
+      });
+      return;
+    }
+  }
+
   if (idx !== undefined) p.foreshadows[idx] = f;
   else p.foreshadows.push(f);
   autoSave(); closeModal(); renderForeshadow();
+}
+
+// 일반용 확인 다이얼로그 (confirmDialog 는 삭제 전용이라 따로 만듦)
+function askDialog({icon='❓', title='확인', message='', okLabel='확인', cancelLabel='취소', okColor='var(--gold)', onOk, onCancel}) {
+  document.querySelectorAll('.ask-dialog-bg').forEach(el => el.remove());
+  const bg = document.createElement('div');
+  bg.className = 'ask-dialog-bg';
+  bg.style.cssText = 'position:fixed;inset:0;background:rgba(24,18,10,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  bg.innerHTML = `<div style="background:var(--paper);border:1px solid var(--border);border-radius:14px;padding:24px;width:360px;max-width:100%;text-align:center;font-family:'Noto Sans KR',sans-serif">
+    <div style="font-size:28px;margin-bottom:12px">${icon}</div>
+    <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:8px">${title}</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:20px">${message}</div>
+    <div style="display:flex;gap:10px">
+      <button class="ask-cancel" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;font-weight:600;font-family:'Noto Sans KR',sans-serif">${esc(cancelLabel)}</button>
+      <button class="ask-ok" style="flex:1;padding:10px;border:none;border-radius:8px;background:${okColor};color:#fff;cursor:pointer;font-size:14px;font-weight:700;font-family:'Noto Sans KR',sans-serif">${esc(okLabel)}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(bg);
+  bg.querySelector('.ask-cancel').addEventListener('click', () => { bg.remove(); onCancel?.(); });
+  bg.querySelector('.ask-ok').addEventListener('click', () => { bg.remove(); onOk?.(); });
+}
+
+// 본문 전체에서 [[복선:oldName]] → [[복선:newName]] 일괄 치환
+// newName === null 이면 태그 제거
+function renameForeshadowTagInContent(oldName, newName) {
+  const p = getProject();
+  if (!p) return 0;
+  const chapters = p.chapters || [];
+  const escapedOld = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`\\[\\[복선:${escapedOld}\\]\\]`, 'g');
+  const replacement = newName ? `[[복선:${newName}]]` : '';
+  let total = 0;
+  chapters.forEach(ch => {
+    if (!ch.content) return;
+    const before = ch.content;
+    const after = before.replace(re, replacement);
+    if (before !== after) {
+      ch.content = after;
+      total += (before.length - after.length) / (oldName.length - (newName||'').length + 5); // 대략
+    }
+  });
+  // 열려있는 에디터가 있으면 반영
+  const editor = document.getElementById('prose-editor');
+  if (editor && editor.dataset.chid) {
+    const cur = chapters.find(c => c.id === editor.dataset.chid);
+    if (cur) editor.value = cur.content || '';
+  } else if (editor && activeChapterId) {
+    const cur = chapters.find(c => c.id === activeChapterId);
+    if (cur) editor.value = cur.content || '';
+  }
+  return total;
 }
 
 function deleteForeshadow(idx) {
@@ -7824,33 +8518,129 @@ function renderChronicle() {
   const p = getProject();
   if (!p) return;
   if (!p.chronicles) p.chronicles = [];
+
+  // 렌더 전에 검색 input 포커스 상태 기록
+  const prevFocused = document.activeElement?.id === 'cr-search-input';
+  const prevSelStart = prevFocused ? document.activeElement.selectionStart : null;
+
   const list = [...p.chronicles].sort((a,b) => (a.order||0)-(b.order||0));
   const IMPORTANCE = ['★★★ 핵심','★★ 중요','★ 일반'];
   const IMP_COLOR = {'★★★ 핵심':'var(--rust)','★★ 중요':'var(--gold)','★ 일반':'var(--muted)'};
 
+  // 필터 상태 (전역 window 에 저장)
+  if (!window._crImpFilter)   window._crImpFilter = '전체';
+  if (!window._crCharFilter)  window._crCharFilter = '전체';
+  if (!window._crPlaceFilter) window._crPlaceFilter = '전체';
+  if (window._crSearch === undefined) window._crSearch = '';
+  const impFilter   = window._crImpFilter;
+  const charFilter  = window._crCharFilter;
+  const placeFilter = window._crPlaceFilter;
+  const search      = window._crSearch.trim().toLowerCase();
+
+  // 필터링 (정렬된 list에 대해)
+  let filtered = list;
+  if (impFilter !== '전체')
+    filtered = filtered.filter(e => (e.importance||'★ 일반') === impFilter);
+  if (charFilter !== '전체')
+    filtered = filtered.filter(e => (e.chars||'').split(',').map(s=>s.trim()).includes(charFilter));
+  if (placeFilter !== '전체')
+    filtered = filtered.filter(e => (e.place||'').trim() === placeFilter);
+  if (search) {
+    filtered = filtered.filter(e =>
+      (e.title||'').toLowerCase().includes(search) ||
+      (e.desc||'').toLowerCase().includes(search) ||
+      (e.time||'').toLowerCase().includes(search) ||
+      (e.place||'').toLowerCase().includes(search) ||
+      (e.chars||'').toLowerCase().includes(search)
+    );
+  }
+
+  const usedChars  = [...new Set(list.flatMap(e=>(e.chars||'').split(',').map(s=>s.trim()).filter(Boolean)))].sort();
+  const usedPlaces = [...new Set(list.map(e=>(e.place||'').trim()).filter(Boolean))].sort();
+  const allImps    = IMPORTANCE.filter(i=>list.some(e=>(e.importance||'★ 일반')===i));
+
+  const selectStyle = 'padding:5px 10px;border-radius:8px;font-size:12px;font-weight:600;background:var(--paper);color:var(--ink);font-family:\'Noto Sans KR\',sans-serif;cursor:pointer;outline:none;';
+
+  const hasAnyFilter = impFilter!=='전체' || charFilter!=='전체' || placeFilter!=='전체' || search;
+
   document.getElementById('main').innerHTML = `
     <div style="max-width:800px;margin:0 auto">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div class="font-display" style="font-size:22px">사건 일지 (${list.length})</div>
         <button class="btn btn-gold" onclick="showChronicleModal()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           사건 추가
         </button>
       </div>
+
+      ${list.length > 0 ? `
+      <!-- 검색 -->
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+        <input id="cr-search-input" value="${esc(window._crSearch)}"
+          oninput="window._crSearch=this.value;clearTimeout(window._crSearchT);window._crSearchT=setTimeout(()=>renderChronicle(),150)"
+          placeholder="사건·시점·장소·인물 검색..."
+          style="flex:1;padding:8px 12px;font-size:13px;border:1.5px solid ${search?'var(--gold)':'var(--border)'};border-radius:8px;background:var(--paper);color:var(--ink);outline:none;font-family:'Noto Sans KR',sans-serif">
+        ${search?`<button onclick="window._crSearch='';renderChronicle()"
+          style="padding:7px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;font-family:'Noto Sans KR',sans-serif">✕</button>`:''}
+      </div>
+
+      <!-- 드롭다운 필터 -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+        ${allImps.length > 0 ? `
+        <select style="${selectStyle}border:1.5px solid ${impFilter!=='전체'?'var(--rust)':'var(--border)'};color:${impFilter!=='전체'?'var(--rust)':'var(--ink)'}"
+          onchange="window._crImpFilter=this.value;renderChronicle()">
+          <option value="전체" ${impFilter==='전체'?'selected':''}>★ 중요도 전체</option>
+          ${allImps.map(i=>`<option value="${i}" ${impFilter===i?'selected':''}>${i}</option>`).join('')}
+        </select>` : ''}
+        ${usedChars.length > 0 ? `
+        <select style="${selectStyle}border:1.5px solid ${charFilter!=='전체'?'var(--teal)':'var(--border)'};color:${charFilter!=='전체'?'var(--teal)':'var(--ink)'}"
+          onchange="window._crCharFilter=this.value;renderChronicle()">
+          <option value="전체" ${charFilter==='전체'?'selected':''}>👤 인물 전체</option>
+          ${usedChars.map(c=>`<option value="${esc(c)}" ${charFilter===c?'selected':''}>${esc(c)}</option>`).join('')}
+        </select>` : ''}
+        ${usedPlaces.length > 0 ? `
+        <select style="${selectStyle}border:1.5px solid ${placeFilter!=='전체'?'var(--gold)':'var(--border)'};color:${placeFilter!=='전체'?'var(--gold)':'var(--ink)'}"
+          onchange="window._crPlaceFilter=this.value;renderChronicle()">
+          <option value="전체" ${placeFilter==='전체'?'selected':''}>📍 장소 전체</option>
+          ${usedPlaces.map(pl=>`<option value="${esc(pl)}" ${placeFilter===pl?'selected':''}>${esc(pl)}</option>`).join('')}
+        </select>` : ''}
+        ${hasAnyFilter ? `
+        <button onclick="window._crImpFilter='전체';window._crCharFilter='전체';window._crPlaceFilter='전체';window._crSearch='';renderChronicle()"
+          style="padding:5px 10px;font-size:11px;font-weight:600;border:1.5px solid var(--border);border-radius:20px;background:transparent;color:var(--muted);cursor:pointer;font-family:'Noto Sans KR',sans-serif">
+          필터 초기화
+        </button>` : ''}
+        <span style="margin-left:auto;font-size:11px;color:var(--muted)">
+          ${hasAnyFilter ? `${filtered.length} / ${list.length}건` : `${list.length}건`}
+          ${list.length >= 2 ? ' · ⠿ 드래그로 정렬' : ''}
+        </span>
+      </div>` : ''}
+
       ${list.length === 0
-        ? `<div class="card empty-state"><div class="emoji">📖</div><p>사건을 추가해보세요.</p></div>`
-        : `<div style="position:relative;padding-left:24px">
+        ? `<div class="card empty-state"><div class="emoji">📖</div>
+            <p style="margin-bottom:4px;font-weight:600">작품 세계 안에서 일어난 사건을 시간순으로 기록해요.</p>
+            <p style="font-size:12px;color:var(--muted);line-height:1.7">
+              첫 만남 · 결정적 선택 · 배신 · 발각 · 운명의 분기점…<br>
+              본편 장면뿐 아니라 과거·막간·설정상 사건도 함께 정리할 수 있어요.
+            </p>
+          </div>`
+        : filtered.length === 0
+        ? `<div class="card empty-state"><div class="emoji">🔍</div><p>조건에 맞는 사건이 없어요.</p></div>`
+        : `<div id="cr-list" style="position:relative;padding-left:24px">
             <div style="position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--border);border-radius:2px"></div>
-            ${list.map(ev => {
+            ${filtered.map(ev => {
               const idx = p.chronicles.indexOf(ev);
               const imp = ev.importance || '★ 일반';
               return `
-              <div style="position:relative;margin-bottom:16px">
+              <div class="ev-drag-item" data-ev-id="${esc(ev.id||'')}" style="position:relative;margin-bottom:16px">
                 <div style="position:absolute;left:-20px;top:14px;width:10px;height:10px;border-radius:50%;
                   background:${IMP_COLOR[imp]};border:2px solid var(--paper)"></div>
-                <div class="card">
-                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-                    <div style="flex:1">
+                <div class="card ev-card">
+                  <div style="display:flex;align-items:flex-start;gap:8px">
+                    <span class="ev-drag-handle" data-ev-id="${esc(ev.id||'')}"
+                      style="color:var(--border);font-size:16px;cursor:grab;flex-shrink:0;
+                        touch-action:none;user-select:none;padding:2px 3px;margin-top:2px;line-height:1"
+                      title="드래그하여 순서 변경">⠿</span>
+                    <div style="flex:1;min-width:0">
                       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
                         <span style="font-size:13px;font-weight:700;color:var(--gold)">${esc(ev.time||'')}</span>
                         <span style="font-size:11px;color:${IMP_COLOR[imp]};font-weight:700">${imp}</span>
@@ -7869,6 +8659,23 @@ function renderChronicle() {
               </div>`}).join('')}
           </div>`}
     </div>`;
+  // 렌더 전 검색 input 포커스였으면 복원
+  if (prevFocused) {
+    setTimeout(() => {
+      const inp = document.getElementById('cr-search-input');
+      if (inp) {
+        inp.focus();
+        try {
+          if (prevSelStart !== null) inp.setSelectionRange(prevSelStart, prevSelStart);
+          else { const v = inp.value; inp.setSelectionRange(v.length, v.length); }
+        } catch(e) {}
+      }
+    }, 0);
+  }
+  // 드래그 활성화 (필터된 상태에선 비활성화 — 보이는 순서가 실제 순서와 다르면 혼란)
+  if (!hasAnyFilter && list.length >= 2) {
+    setTimeout(initChronicleDrag, 30);
+  }
 }
 
 function showChronicleModal(idx) {
@@ -7879,16 +8686,16 @@ function showChronicleModal(idx) {
   showModal(`
     <div class="modal-title">${idx !== undefined ? '사건 수정' : '사건 추가'}</div>
     <div class="form-grid">
-      <div><label class="label">작품 내 시점 *</label>
-        <input id="cr-time" value="${esc(ev.time||'')}" placeholder="예: D+3일, 1부 3화 직후"></div>
-      <div><label class="label">정렬 순서</label>
-        <input id="cr-order" type="number" value="${ev.order||0}" placeholder="숫자가 작을수록 앞"></div>
+      <div class="full"><label class="label">작품 내 시점 *
+        <span style="font-size:11px;color:var(--muted);font-weight:500">— 작품 세계의 시간축. 회차와 달라도 OK</span>
+      </label>
+        <input id="cr-time" value="${esc(ev.time||'')}" placeholder="예: D+3일, 즉위 5년 봄, 1부 3화 직후, 주인공 10세"></div>
       <div class="full"><label class="label">사건 제목 *</label>
         <input id="cr-title" value="${esc(ev.title||'')}" placeholder="사건을 한 줄로 요약"></div>
       <div class="full"><label class="label">사건 내용</label>
-        <textarea id="cr-desc" rows="3" placeholder="자세한 내용">${esc(ev.desc||'')}</textarea></div>
+        <textarea id="cr-desc" rows="3" placeholder="자세한 내용 — 누가·어디서·무엇이 어떻게">${esc(ev.desc||'')}</textarea></div>
       <div><label class="label">장소</label>
-        <input id="cr-place" value="${esc(ev.place||'')}" placeholder="예: 왕궁, 시장"></div>
+        <input id="cr-place" value="${esc(ev.place||'')}" placeholder="예: 왕궁, 시장, 동굴"></div>
       <div><label class="label">중요도</label>
         <select id="cr-importance">${IMPORTANCE.map(s=>`<option value="${s}" ${ev.importance===s?'selected':''}>${s}</option>`).join('')}</select></div>
       <div class="full"><label class="label">관련 인물</label>
@@ -7927,12 +8734,17 @@ function saveChronicle(idx) {
   if (!p.chronicles) p.chronicles = [];
   const checked = [...document.querySelectorAll('input[name="cr-chars-check"]:checked')].map(el=>el.value).join(', ');
   const chars = checked || (document.getElementById('cr-chars')?.value||'');
+  // 신규면 기존 최대 order + 1, 수정이면 기존 값 유지
+  const defaultOrder = idx !== undefined
+    ? (p.chronicles[idx].order || 0)
+    : (p.chronicles.reduce((m, e) => Math.max(m, e.order||0), 0) + 1);
   const ev = {
     id: idx !== undefined ? p.chronicles[idx].id : uid(),
     time, title, desc: document.getElementById('cr-desc').value,
     place: document.getElementById('cr-place').value,
     importance: document.getElementById('cr-importance').value,
-    order: parseInt(document.getElementById('cr-order').value)||0, chars
+    order: defaultOrder,
+    chars
   };
   if (idx !== undefined) p.chronicles[idx] = ev;
   else p.chronicles.push(ev);
@@ -7940,11 +8752,154 @@ function saveChronicle(idx) {
 }
 
 function deleteChronicle(idx) {
-  confirmDialog('이 사건을 삭제합니다.', () => {
-    const p = getProject();
+  const p = getProject();
+  const ev = p?.chronicles?.[idx];
+  const title = ev?.title ? `"${ev.title}"` : '이 사건';
+  confirmDialog(`${title}을(를) 삭제합니다.`, () => {
     p.chronicles.splice(idx, 1);
     autoSave(); renderChronicle();
   });
+}
+
+// ─── 사건 일지 드래그 앤 드롭 ────────────────────────────────
+let _evDrag = null;
+
+function initChronicleDrag() {
+  document.querySelectorAll('.ev-drag-handle').forEach(h => {
+    h.addEventListener('mousedown', evMouseStart);
+    h.addEventListener('touchstart', evTouchStart, { passive: false });
+  });
+}
+
+function evTouchStart(e) {
+  e.preventDefault();
+  const t = e.touches[0];
+  evDragInit(e.currentTarget, t.clientX, t.clientY);
+  document.addEventListener('touchmove', evTouchMove, { passive: false });
+  document.addEventListener('touchend', evTouchEnd, { once: true });
+}
+function evMouseStart(e) {
+  evDragInit(e.currentTarget, e.clientX, e.clientY);
+  document.addEventListener('mousemove', evMouseMove);
+  document.addEventListener('mouseup', evMouseEnd, { once: true });
+}
+
+function evDragInit(handle, x, y) {
+  const evId = handle.dataset.evId;
+  const row = handle.closest('.ev-drag-item');
+  if (!row) return;
+  const rect = row.getBoundingClientRect();
+  const p = getProject();
+  const ev = (p?.chronicles || []).find(e => e.id === evId);
+  const label = ev ? (ev.title || '(제목 없음)') : '사건';
+
+  const ghost = document.createElement('div');
+  ghost.style.cssText = `position:fixed;left:${rect.left+24}px;top:${rect.top}px;
+    width:${rect.width-24}px;height:40px;z-index:9999;pointer-events:none;
+    box-shadow:0 6px 24px rgba(0,0,0,.18);border-radius:10px;
+    background:var(--gold-light);border:2px solid var(--gold);
+    display:flex;align-items:center;padding:0 14px;gap:10px;opacity:.92`;
+  ghost.innerHTML = `<span style="font-size:16px;color:var(--gold)">⠿</span>
+    <span style="font-weight:700;font-size:13px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}</span>`;
+  document.body.appendChild(ghost);
+  row.style.opacity = '0.3';
+
+  _evDrag = {
+    evId,
+    row,
+    ghost,
+    offsetX: x - rect.left - 24,
+    offsetY: y - rect.top,
+    dropTarget: null,
+  };
+}
+
+function evTouchMove(e) {
+  if (!_evDrag) return;
+  e.preventDefault();
+  evDragMove(e.touches[0].clientX, e.touches[0].clientY);
+}
+function evMouseMove(e) {
+  if (!_evDrag) return;
+  evDragMove(e.clientX, e.clientY);
+}
+
+function evDragMove(cx, cy) {
+  const { ghost, offsetX, offsetY, row } = _evDrag;
+  ghost.style.left = (cx - offsetX) + 'px';
+  ghost.style.top = (cy - offsetY) + 'px';
+
+  document.querySelectorAll('.ev-drop-line').forEach(el => el.remove());
+
+  const all = [...document.querySelectorAll('.ev-drag-item')];
+  let bestRow = null, bestBefore = true;
+  for (const r of all) {
+    if (r === row) continue;
+    const rc = r.getBoundingClientRect();
+    if (cy >= rc.top - 8 && cy <= rc.bottom + 8) {
+      bestRow = r;
+      bestBefore = cy < rc.top + rc.height / 2;
+      break;
+    }
+  }
+  if (bestRow) {
+    const line = document.createElement('div');
+    line.className = 'ev-drop-line';
+    const rc = bestRow.getBoundingClientRect();
+    line.style.cssText = `position:fixed;left:${rc.left}px;width:${rc.width}px;
+      top:${bestBefore ? rc.top - 2 : rc.bottom - 1}px;height:3px;
+      background:var(--gold);z-index:9998;pointer-events:none;border-radius:2px`;
+    document.body.appendChild(line);
+    _evDrag.dropTarget = { rowEl: bestRow, before: bestBefore };
+  } else {
+    _evDrag.dropTarget = null;
+  }
+}
+
+function evTouchEnd() {
+  document.removeEventListener('touchmove', evTouchMove);
+  evDragCommit();
+}
+function evMouseEnd() {
+  document.removeEventListener('mousemove', evMouseMove);
+  evDragCommit();
+}
+
+function evDragCommit() {
+  if (!_evDrag) return;
+  const { evId, row, ghost, dropTarget } = _evDrag;
+  _evDrag = null;
+
+  ghost.remove();
+  document.querySelectorAll('.ev-drop-line').forEach(el => el.remove());
+  row.style.opacity = '';
+
+  if (!dropTarget) return;
+  const p = getProject();
+  if (!p?.chronicles) return;
+
+  // 현재 표시 순서대로 배열 재구성
+  const all = [...document.querySelectorAll('.ev-drag-item')];
+  const reordered = [];
+  for (const r of all) {
+    if (r === row) continue;
+    if (r === dropTarget.rowEl && dropTarget.before) {
+      const draggedEv = p.chronicles.find(e => e.id === evId);
+      if (draggedEv) reordered.push(draggedEv);
+    }
+    const rowEv = p.chronicles.find(e => e.id === r.dataset.evId);
+    if (rowEv) reordered.push(rowEv);
+    if (r === dropTarget.rowEl && !dropTarget.before) {
+      const draggedEv = p.chronicles.find(e => e.id === evId);
+      if (draggedEv) reordered.push(draggedEv);
+    }
+  }
+  // order 재할당 (10 간격으로, 나중에 삽입 여유 확보)
+  reordered.forEach((ev, i) => { ev.order = (i + 1) * 10; });
+  // p.chronicles 배열 자체도 동일 순서로 재배치 (indexOf 기반 편집이 정상 동작하려면)
+  p.chronicles = reordered;
+  autoSave();
+  renderChronicle();
 }
 
 function renderItems() {
@@ -8463,6 +9418,335 @@ function frClear() {
   const el = document.getElementById('fr-count');
   if (el) { el.textContent = ''; }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 전체 작품 검색 (Global Search)
+// 모든 화의 본문·제목·요약·메모를 한 번에 검색
+// ═══════════════════════════════════════════════════════════════
+const GS = {
+  query: '',
+  scopes: { content: true, title: true, summary: true, memo: true },
+  caseSensitive: false,
+  regex: false,
+  results: [],   // [{chId, field, pos, len, before, match, after, chTitle, folderName}]
+  debounce: null,
+};
+
+function openGlobalSearch() {
+  if (!getProject()) { toast('프로젝트를 먼저 열어주세요.'); return; }
+  let modal = document.getElementById('gs-modal');
+  if (modal) { modal.style.display = 'flex'; document.getElementById('gs-input')?.focus(); return; }
+
+  modal = document.createElement('div');
+  modal.id = 'gs-modal';
+  modal.className = 'gs-modal';
+  modal.innerHTML = `
+    <div class="gs-backdrop" onclick="closeGlobalSearch()"></div>
+    <div class="gs-panel" role="dialog" aria-label="전체 작품 검색">
+      <div class="gs-header">
+        <div style="font-family:'Noto Serif KR',serif;font-size:18px;font-weight:700;color:var(--ink)">
+          🔎 전체 작품 검색
+        </div>
+        <button class="gs-close" onclick="closeGlobalSearch()" title="닫기 (Esc)">✕</button>
+      </div>
+      <div class="gs-search-row">
+        <input id="gs-input" type="text" placeholder="검색어를 입력하세요..." autocomplete="off"
+          oninput="gsOnInput()" onkeydown="gsOnKeydown(event)">
+        <span id="gs-count" class="gs-count">—</span>
+      </div>
+      <div class="gs-options">
+        <div class="gs-pill-row">
+          <span class="gs-pill-label">범위</span>
+          <button class="gs-pill" data-scope="content" onclick="gsToggleScope('content')">
+            <span class="gs-pill-icon"></span>본문
+          </button>
+          <button class="gs-pill" data-scope="title" onclick="gsToggleScope('title')">
+            <span class="gs-pill-icon"></span>제목
+          </button>
+          <button class="gs-pill" data-scope="summary" onclick="gsToggleScope('summary')">
+            <span class="gs-pill-icon"></span>회차 요약
+          </button>
+          <button class="gs-pill" data-scope="memo" onclick="gsToggleScope('memo')">
+            <span class="gs-pill-icon"></span>메모
+          </button>
+        </div>
+        <div class="gs-pill-row">
+          <span class="gs-pill-label">옵션</span>
+          <button class="gs-pill gs-pill-opt" data-opt="case" onclick="gsToggleOpt('case')" title="대소문자 구분">
+            <span class="gs-pill-mono">Aa</span>대소문자
+          </button>
+          <button class="gs-pill gs-pill-opt" data-opt="regex" onclick="gsToggleOpt('regex')" title="정규식 사용">
+            <span class="gs-pill-mono">.*</span>정규식
+          </button>
+        </div>
+      </div>
+      <div class="gs-results" id="gs-results">
+        <div class="gs-empty">검색어를 입력하면 결과가 표시됩니다.</div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  // 직전 검색어 복원
+  const input = document.getElementById('gs-input');
+  if (GS.query) { input.value = GS.query; gsRun(); }
+  gsSyncPills();
+  setTimeout(() => { input?.focus(); input?.select(); }, 30);
+}
+
+function gsSyncPills() {
+  // 범위 pill
+  document.querySelectorAll('#gs-modal .gs-pill[data-scope]').forEach(btn => {
+    const key = btn.dataset.scope;
+    btn.classList.toggle('active', !!GS.scopes[key]);
+  });
+  // 옵션 pill
+  const caseBtn = document.querySelector('#gs-modal .gs-pill[data-opt="case"]');
+  if (caseBtn) caseBtn.classList.toggle('active', GS.caseSensitive);
+  const regexBtn = document.querySelector('#gs-modal .gs-pill[data-opt="regex"]');
+  if (regexBtn) regexBtn.classList.toggle('active', GS.regex);
+}
+
+function closeGlobalSearch() {
+  const m = document.getElementById('gs-modal');
+  if (m) m.style.display = 'none';
+}
+
+function gsToggleScope(key) {
+  GS.scopes[key] = !GS.scopes[key];
+  // 최소 하나는 켜져있어야 함
+  const anyOn = Object.values(GS.scopes).some(v => v);
+  if (!anyOn) { GS.scopes[key] = true; toast('최소 하나의 범위는 선택해야 해요.'); return; }
+  gsSyncPills();
+  gsRun();
+}
+
+function gsToggleOpt(opt) {
+  if (opt === 'case') GS.caseSensitive = !GS.caseSensitive;
+  else if (opt === 'regex') GS.regex = !GS.regex;
+  gsSyncPills();
+  gsRun();
+}
+
+function gsOnInput() {
+  GS.query = document.getElementById('gs-input').value;
+  clearTimeout(GS.debounce);
+  GS.debounce = setTimeout(gsRun, 120);
+}
+
+function gsOnKeydown(e) {
+  if (e.key === 'Escape') { e.preventDefault(); closeGlobalSearch(); return; }
+  if (e.key === 'Enter') { e.preventDefault(); gsRun(); }
+}
+
+function gsBuildRegex() {
+  const q = GS.query;
+  if (!q) return null;
+  const flags = GS.caseSensitive ? 'g' : 'gi';
+  try {
+    if (GS.regex) return new RegExp(q, flags);
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(escaped, flags);
+  } catch (err) {
+    return { _invalid: true, message: err.message };
+  }
+}
+
+function gsRun() {
+  GS.results = [];
+  const container = document.getElementById('gs-results');
+  const countEl = document.getElementById('gs-count');
+  if (!container) return;
+
+  const p = getProject();
+  if (!p) return;
+  const q = GS.query.trim();
+  if (!q) {
+    container.innerHTML = '<div class="gs-empty">검색어를 입력하면 결과가 표시됩니다.</div>';
+    if (countEl) countEl.textContent = '—';
+    return;
+  }
+
+  const regex = gsBuildRegex();
+  if (!regex) { container.innerHTML = '<div class="gs-empty">검색어를 입력하면 결과가 표시됩니다.</div>'; return; }
+  if (regex._invalid) {
+    container.innerHTML = `<div class="gs-empty" style="color:var(--rust)">정규식 오류: ${esc(regex.message)}</div>`;
+    if (countEl) { countEl.textContent = '오류'; countEl.style.color = 'var(--rust)'; }
+    return;
+  }
+
+  const chapters = p.chapters || [];
+  const folders = p.chapterFolders || [];
+  const folderMap = {};
+  folders.forEach(f => { folderMap[f.id] = f.name; });
+
+  const FIELDS = [
+    { key: 'title',   label: '제목', prop: 'title' },
+    { key: 'summary', label: '요약', prop: 'summary' },
+    { key: 'memo',    label: '메모', prop: 'memo' },
+    { key: 'content', label: '본문', prop: 'content' },
+  ];
+
+  chapters.forEach(ch => {
+    FIELDS.forEach(f => {
+      if (!GS.scopes[f.key]) return;
+      const text = ch[f.prop] || '';
+      if (!text) return;
+      let m;
+      // stateful regex — reset lastIndex
+      regex.lastIndex = 0;
+      const maxPerField = 500; // 화당 필드당 최대
+      let count = 0;
+      while ((m = regex.exec(text)) !== null) {
+        const pos = m.index;
+        const matched = m[0];
+        if (matched.length === 0) { regex.lastIndex++; continue; }
+        const ctxBefore = 30, ctxAfter = 40;
+        const bStart = Math.max(0, pos - ctxBefore);
+        const aEnd   = Math.min(text.length, pos + matched.length + ctxAfter);
+        GS.results.push({
+          chId: ch.id,
+          field: f.key,
+          fieldLabel: f.label,
+          pos,
+          len: matched.length,
+          before: (bStart > 0 ? '…' : '') + text.substring(bStart, pos),
+          match: matched,
+          after: text.substring(pos + matched.length, aEnd) + (aEnd < text.length ? '…' : ''),
+          chTitle: ch.title || '(무제)',
+          folderName: folderMap[ch.folderId] || '',
+        });
+        count++;
+        if (count >= maxPerField) break;
+      }
+    });
+  });
+
+  // 화 순서대로 묶기
+  const chIdx = {};
+  chapters.forEach((c, i) => { chIdx[c.id] = i; });
+  GS.results.sort((a, b) => {
+    if (chIdx[a.chId] !== chIdx[b.chId]) return chIdx[a.chId] - chIdx[b.chId];
+    // field 순서는 이미 FIELDS 순서대로 push 되었으니 안정 정렬로 유지됨
+    return a.pos - b.pos;
+  });
+
+  gsRenderResults();
+}
+
+function gsRenderResults() {
+  const container = document.getElementById('gs-results');
+  const countEl = document.getElementById('gs-count');
+  if (!container) return;
+
+  if (GS.results.length === 0) {
+    container.innerHTML = '<div class="gs-empty">일치하는 내용이 없습니다.</div>';
+    if (countEl) { countEl.textContent = '0건'; countEl.style.color = 'var(--muted)'; }
+    return;
+  }
+
+  // 화별 그룹
+  const groups = {};
+  const order = [];
+  GS.results.forEach((r, i) => {
+    if (!groups[r.chId]) { groups[r.chId] = { chTitle: r.chTitle, folderName: r.folderName, items: [] }; order.push(r.chId); }
+    groups[r.chId].items.push({ ...r, _idx: i });
+  });
+
+  const totalCh = order.length;
+  const totalHits = GS.results.length;
+  if (countEl) {
+    countEl.textContent = `${totalHits}건 · ${totalCh}화`;
+    countEl.style.color = 'var(--teal)';
+  }
+
+  const FIELD_COLOR = {
+    content: 'var(--ink)',
+    title:   'var(--gold)',
+    summary: 'var(--teal)',
+    memo:    'var(--rust)',
+  };
+
+  const html = order.map(chId => {
+    const g = groups[chId];
+    const hits = g.items.length;
+    return `
+      <div class="gs-group">
+        <div class="gs-group-header">
+          <span class="gs-group-title">${g.folderName ? `<span class="gs-folder">[${esc(g.folderName)}]</span> ` : ''}${esc(g.chTitle)}</span>
+          <span class="gs-group-count">${hits}건</span>
+        </div>
+        <div class="gs-group-body">
+          ${g.items.map(it => `
+            <div class="gs-hit" onclick="gsJumpTo(${it._idx})">
+              <span class="gs-field-tag" style="background:${FIELD_COLOR[it.field]}">${it.fieldLabel}</span>
+              <span class="gs-snippet">${esc(it.before)}<mark>${esc(it.match)}</mark>${esc(it.after)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = html;
+}
+
+function gsJumpTo(idx) {
+  const r = GS.results[idx];
+  if (!r) return;
+  const p = getProject();
+  if (!p) return;
+  const ch = (p.chapters || []).find(c => c.id === r.chId);
+  if (!ch) { toast('해당 화를 찾을 수 없어요.'); return; }
+
+  closeGlobalSearch();
+
+  // 화 탭이 아니면 이동
+  const needNavigate = state.activeTab !== 'chapters';
+  activeChapterId = r.chId;
+  if (needNavigate) {
+    navigate('chapters');
+  } else {
+    renderChapters();
+  }
+
+  // 렌더 후 포커스 & 위치 설정
+  setTimeout(() => {
+    const pos = r.pos;
+    const len = r.len;
+
+    if (r.field === 'content') {
+      const ta = document.getElementById('prose-editor');
+      if (ta) {
+        ta.focus();
+        try { ta.setSelectionRange(pos, pos + len); } catch(e) {}
+        // 해당 위치로 스크롤
+        const lineHeight = parseInt(getComputedStyle(ta).lineHeight) || 24;
+        const lines = (ta.value || '').substring(0, pos).split('\n').length;
+        ta.scrollTop = Math.max(0, (lines - 3) * lineHeight);
+      }
+    } else if (r.field === 'title') {
+      const titleIn = document.getElementById('chapter-title-input');
+      if (titleIn) { titleIn.focus(); try { titleIn.setSelectionRange(pos, pos+len); } catch(e) {} titleIn.scrollIntoView({block:'center', behavior:'smooth'}); }
+    } else if (r.field === 'summary') {
+      const sumIn = document.getElementById('chapter-summary-input');
+      if (sumIn) { sumIn.focus(); try { sumIn.setSelectionRange(pos, pos+len); } catch(e) {} sumIn.scrollIntoView({block:'center', behavior:'smooth'}); }
+    } else if (r.field === 'memo') {
+      // 메모 펼치고 포커스
+      const body = document.getElementById('ch-memo-body');
+      const arrow = document.getElementById('ch-memo-arrow');
+      if (body && body.style.display === 'none') {
+        body.style.display = 'block';
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
+      }
+      const memoTa = document.querySelector('#ch-memo-body textarea');
+      if (memoTa) {
+        memoTa.focus();
+        try { memoTa.setSelectionRange(pos, pos+len); } catch(e) {}
+        memoTa.scrollIntoView({block:'center', behavior:'smooth'});
+      }
+    }
+  }, needNavigate ? 120 : 60);
+}
+
 
 function showItemModal(idx) {
   const p = getProject();
