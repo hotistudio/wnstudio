@@ -800,7 +800,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 <div id="app">
   <!-- HEADER -->
   <header id="header">
-    <button id="header-title" onclick="goHome()">호필 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.4.15 beta</span></button>
+    <button id="header-title" onclick="goHome()">호필 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.4.16 beta</span></button>
     <button class="header-btn" id="menu-toggle" onclick="toggleSidebar()" style="display:none;padding:6px 8px">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- 왼쪽 세로선 -->
@@ -863,11 +863,11 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
         </button>
         <button class="nav-item" onclick="navigate('foreshadow')" data-tab="foreshadow">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
-          복선 관리 <span style="font-size:9px;font-weight:700;background:var(--teal);color:#fff;padding:1px 5px;border-radius:4px;letter-spacing:.3px;vertical-align:middle">BETA</span>
+          복선 관리
         </button>
         <button class="nav-item" onclick="navigate('chronicle')" data-tab="chronicle">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          사건 일지 <span style="font-size:9px;font-weight:700;background:var(--teal);color:#fff;padding:1px 5px;border-radius:4px;letter-spacing:.3px;vertical-align:middle">BETA</span>
+          사건 일지
         </button>
         <div class="nav-section">작품 관리</div>
         <button class="nav-item" onclick="navigate('world')" data-tab="world">
@@ -1501,7 +1501,7 @@ function renderHome() {
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
         <p style="font-size:11px;color:var(--muted);opacity:.6;line-height:1.8">
-          호필 스튜디오 v0.4.15 beta · © 2026 호백<br>
+          호필 스튜디오 v0.4.16 beta · © 2026 호백<br>
           <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
             style="color:var(--muted);text-decoration:none;opacity:.8">CC BY-NC 4.0</a>
           · 비상업적 목적에 한해 자유롭게 사용 가능<br>
@@ -3422,6 +3422,8 @@ function deleteChapter(id) {
   confirmDialog('이 화를 삭제합니다.', () => {
   const p = getProject();
   p.chapters = p.chapters.filter(c => c.id !== id);
+  // 사건 일지 고아 참조 정리
+  (p.chronicles || []).forEach(ev => { if (ev.chapterId === id) ev.chapterId = ''; });
   if (activeChapterId === id) activeChapterId = p.chapters[0]?.id || null;
   autoSave(); renderChapters();
   });
@@ -8524,54 +8526,130 @@ function deleteForeshadow(idx) {
 // ═══════════════════════════════════════════════════════════
 // 사건 일지
 // ═══════════════════════════════════════════════════════════
+// chars 필드를 항상 배열로 반환 (하위 호환: 문자열이면 쉼표 분리)
+function _crCharsArr(ev) {
+  if (!ev) return [];
+  if (Array.isArray(ev.chars)) return ev.chars.filter(Boolean);
+  if (typeof ev.chars === 'string') return ev.chars.split(',').map(s=>s.trim()).filter(Boolean);
+  return [];
+}
+// 표시용 문자열
+function _crCharsStr(ev) {
+  return _crCharsArr(ev).join(', ');
+}
+
+// 회차 ID → 회차 객체
+function _crGetChapter(chapterId) {
+  if (!chapterId) return null;
+  const p = getProject();
+  return (p?.chapters||[]).find(c => c.id === chapterId) || null;
+}
+
+// 회차 ID → 정렬용 순서(배열 인덱스). 연결 없으면 Infinity (맨 뒤)
+function _crChapterOrder(chapterId) {
+  if (!chapterId) return Infinity;
+  const p = getProject();
+  const idx = (p?.chapters||[]).findIndex(c => c.id === chapterId);
+  return idx < 0 ? Infinity : idx;
+}
+
+// 사건 카드의 📖 배지 클릭 → 해당 회차 열기
+function crJumpToChapter(chapterId) {
+  const ch = _crGetChapter(chapterId);
+  if (!ch) { toast('연결된 회차를 찾을 수 없어요.'); return; }
+  activeChapterId = ch.id;
+  navigate('chapters');
+}
+
 function renderChronicle() {
   const p = getProject();
   if (!p) return;
   if (!p.chronicles) p.chronicles = [];
 
+  // order 없는 항목 보정 — 현재 배열 순서대로 10 간격 부여
+  let _orderFixed = false;
+  p.chronicles.forEach((e, i) => {
+    if (!e.order) { e.order = (i + 1) * 10; _orderFixed = true; }
+  });
+  if (_orderFixed) autoSave();
+
   // 렌더 전에 검색 input 포커스 상태 기록
   const prevFocused = document.activeElement?.id === 'cr-search-input';
   const prevSelStart = prevFocused ? document.activeElement.selectionStart : null;
-
-  const list = [...p.chronicles].sort((a,b) => (a.order||0)-(b.order||0));
-  const IMPORTANCE = ['★★★ 핵심','★★ 중요','★ 일반'];
-  const IMP_COLOR = {'★★★ 핵심':'var(--rust)','★★ 중요':'var(--gold)','★ 일반':'var(--muted)'};
 
   // 필터 상태 (전역 window 에 저장)
   if (!window._crImpFilter)   window._crImpFilter = '전체';
   if (!window._crCharFilter)  window._crCharFilter = '전체';
   if (!window._crPlaceFilter) window._crPlaceFilter = '전체';
+  if (!window._crChapterFilter) window._crChapterFilter = '전체';
+  if (!window._crSortMode)    window._crSortMode = 'manual'; // 'manual' | 'chapter' | 'time'
   if (window._crSearch === undefined) window._crSearch = '';
-  const impFilter   = window._crImpFilter;
-  const charFilter  = window._crCharFilter;
-  const placeFilter = window._crPlaceFilter;
-  const search      = window._crSearch.trim().toLowerCase();
+  const impFilter     = window._crImpFilter;
+  const charFilter    = window._crCharFilter;
+  const placeFilter   = window._crPlaceFilter;
+  const chapterFilter = window._crChapterFilter;
+  const sortMode      = window._crSortMode;
+  const search        = window._crSearch.trim().toLowerCase();
+
+  // 정렬 모드에 따라 list 재정렬
+  let list;
+  if (sortMode === 'chapter') {
+    // 회차 순 → 회차 내에서는 수동 order 유지
+    list = [...p.chronicles].sort((a,b) => {
+      const ca = _crChapterOrder(a.chapterId);
+      const cb = _crChapterOrder(b.chapterId);
+      if (ca !== cb) return ca - cb;
+      return (a.order||0) - (b.order||0);
+    });
+  } else if (sortMode === 'time') {
+    // 작중 연대순 → sortKey 오름차순, 없는 건 Infinity (맨 뒤). 동률은 수동 order 유지
+    list = [...p.chronicles].sort((a,b) => {
+      const sa = (a.sortKey ?? Infinity);
+      const sb = (b.sortKey ?? Infinity);
+      if (sa !== sb) return sa - sb;
+      return (a.order||0) - (b.order||0);
+    });
+  } else {
+    list = [...p.chronicles].sort((a,b) => (a.order||0) - (b.order||0));
+  }
+
+  const IMPORTANCE = ['★★★ 핵심','★★ 중요','★ 일반'];
+  const IMP_COLOR = {'★★★ 핵심':'var(--rust)','★★ 중요':'var(--gold)','★ 일반':'var(--muted)'};
 
   // 필터링 (정렬된 list에 대해)
   let filtered = list;
   if (impFilter !== '전체')
     filtered = filtered.filter(e => (e.importance||'★ 일반') === impFilter);
   if (charFilter !== '전체')
-    filtered = filtered.filter(e => (e.chars||'').split(',').map(s=>s.trim()).includes(charFilter));
+    filtered = filtered.filter(e => _crCharsArr(e).includes(charFilter));
   if (placeFilter !== '전체')
     filtered = filtered.filter(e => (e.place||'').trim() === placeFilter);
+  if (chapterFilter !== '전체') {
+    if (chapterFilter === '__none__') filtered = filtered.filter(e => !e.chapterId);
+    else filtered = filtered.filter(e => e.chapterId === chapterFilter);
+  }
   if (search) {
     filtered = filtered.filter(e =>
       (e.title||'').toLowerCase().includes(search) ||
       (e.desc||'').toLowerCase().includes(search) ||
       (e.time||'').toLowerCase().includes(search) ||
       (e.place||'').toLowerCase().includes(search) ||
-      (e.chars||'').toLowerCase().includes(search)
+      _crCharsStr(e).toLowerCase().includes(search)
     );
   }
 
-  const usedChars  = [...new Set(list.flatMap(e=>(e.chars||'').split(',').map(s=>s.trim()).filter(Boolean)))].sort();
+  const usedChars  = [...new Set(list.flatMap(e=>_crCharsArr(e)))].sort();
   const usedPlaces = [...new Set(list.map(e=>(e.place||'').trim()).filter(Boolean))].sort();
   const allImps    = IMPORTANCE.filter(i=>list.some(e=>(e.importance||'★ 일반')===i));
+  // 사건에서 실제로 쓰인 회차 id (유효한 것만, 현재 회차 순서대로)
+  const usedChapterIds = new Set(list.map(e=>e.chapterId).filter(Boolean));
+  const usedChapters = (p.chapters||[]).filter(c => !c.isFolder && usedChapterIds.has(c.id));
+  const hasUnlinked = list.some(e => !e.chapterId);
 
   const selectStyle = 'padding:5px 10px;border-radius:8px;font-size:12px;font-weight:600;background:var(--paper);color:var(--ink);font-family:\'Noto Sans KR\',sans-serif;cursor:pointer;outline:none;';
 
-  const hasAnyFilter = impFilter!=='전체' || charFilter!=='전체' || placeFilter!=='전체' || search;
+  const hasAnyFilter = impFilter!=='전체' || charFilter!=='전체' || placeFilter!=='전체' || chapterFilter!=='전체' || search;
+  const canDrag = sortMode === 'manual' && !hasAnyFilter && list.length >= 2;
 
   document.getElementById('main').innerHTML = `
     <div style="max-width:800px;margin:0 auto">
@@ -8594,8 +8672,24 @@ function renderChronicle() {
           style="padding:7px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;font-family:'Noto Sans KR',sans-serif">✕</button>`:''}
       </div>
 
-      <!-- 드롭다운 필터 -->
+      <!-- 드롭다운 필터 + 정렬 -->
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+        <!-- 정렬 모드 토글 -->
+        <div style="display:inline-flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:var(--paper)">
+          <button onclick="window._crSortMode='manual';renderChronicle()"
+            style="padding:5px 10px;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:'Noto Sans KR',sans-serif;
+              background:${sortMode==='manual'?'var(--gold)':'transparent'};color:${sortMode==='manual'?'#fff':'var(--muted)'}"
+            title="드래그로 직접 정한 순서">📝 수동</button>
+          <button onclick="window._crSortMode='time';renderChronicle()"
+            style="padding:5px 10px;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:'Noto Sans KR',sans-serif;border-left:1.5px solid var(--border);
+              background:${sortMode==='time'?'var(--gold)':'transparent'};color:${sortMode==='time'?'#fff':'var(--muted)'}"
+            title="작중 연대순 숫자로 정렬">⏳ 연대순</button>
+          <button onclick="window._crSortMode='chapter';renderChronicle()"
+            style="padding:5px 10px;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:'Noto Sans KR',sans-serif;border-left:1.5px solid var(--border);
+              background:${sortMode==='chapter'?'var(--gold)':'transparent'};color:${sortMode==='chapter'?'#fff':'var(--muted)'}"
+            title="연결된 회차 순서대로 정렬">📖 회차순</button>
+        </div>
+
         ${allImps.length > 0 ? `
         <select style="${selectStyle}border:1.5px solid ${impFilter!=='전체'?'var(--rust)':'var(--border)'};color:${impFilter!=='전체'?'var(--rust)':'var(--ink)'}"
           onchange="window._crImpFilter=this.value;renderChronicle()">
@@ -8614,14 +8708,21 @@ function renderChronicle() {
           <option value="전체" ${placeFilter==='전체'?'selected':''}>📍 장소 전체</option>
           ${usedPlaces.map(pl=>`<option value="${esc(pl)}" ${placeFilter===pl?'selected':''}>${esc(pl)}</option>`).join('')}
         </select>` : ''}
+        ${(usedChapters.length > 0 || hasUnlinked) ? `
+        <select style="${selectStyle}border:1.5px solid ${chapterFilter!=='전체'?'var(--teal)':'var(--border)'};color:${chapterFilter!=='전체'?'var(--teal)':'var(--ink)'}"
+          onchange="window._crChapterFilter=this.value;renderChronicle()">
+          <option value="전체" ${chapterFilter==='전체'?'selected':''}>📖 회차 전체</option>
+          ${hasUnlinked ? `<option value="__none__" ${chapterFilter==='__none__'?'selected':''}>— 연결 없음</option>` : ''}
+          ${usedChapters.map(c=>`<option value="${esc(c.id)}" ${chapterFilter===c.id?'selected':''}>${esc(c.title||'(제목 없음)')}</option>`).join('')}
+        </select>` : ''}
         ${hasAnyFilter ? `
-        <button onclick="window._crImpFilter='전체';window._crCharFilter='전체';window._crPlaceFilter='전체';window._crSearch='';renderChronicle()"
+        <button onclick="window._crImpFilter='전체';window._crCharFilter='전체';window._crPlaceFilter='전체';window._crChapterFilter='전체';window._crSearch='';renderChronicle()"
           style="padding:5px 10px;font-size:11px;font-weight:600;border:1.5px solid var(--border);border-radius:20px;background:transparent;color:var(--muted);cursor:pointer;font-family:'Noto Sans KR',sans-serif">
           필터 초기화
         </button>` : ''}
         <span style="margin-left:auto;font-size:11px;color:var(--muted)">
           ${hasAnyFilter ? `${filtered.length} / ${list.length}건` : `${list.length}건`}
-          ${list.length >= 2 ? ' · ⠿ 드래그로 정렬' : ''}
+          ${canDrag ? ' · ⠿ 드래그로 정렬' : (sortMode!=='manual' && list.length>=2 ? ` · ${sortMode==='time'?'연대순':'회차순'} (드래그 비활성)` : '')}
         </span>
       </div>` : ''}
 
@@ -8638,31 +8739,37 @@ function renderChronicle() {
         : `<div id="cr-list" style="position:relative;padding-left:24px">
             <div style="position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--border);border-radius:2px"></div>
             ${filtered.map(ev => {
-              const idx = p.chronicles.indexOf(ev);
               const imp = ev.importance || '★ 일반';
+              const charsStr = _crCharsStr(ev);
+              const evIdEsc = esc(ev.id||'');
+              const linkedCh = _crGetChapter(ev.chapterId);
               return `
-              <div class="ev-drag-item" data-ev-id="${esc(ev.id||'')}" style="position:relative;margin-bottom:16px">
+              <div class="ev-drag-item" data-ev-id="${evIdEsc}" style="position:relative;margin-bottom:16px">
                 <div style="position:absolute;left:-20px;top:14px;width:10px;height:10px;border-radius:50%;
                   background:${IMP_COLOR[imp]};border:2px solid var(--paper)"></div>
                 <div class="card ev-card">
                   <div style="display:flex;align-items:flex-start;gap:8px">
-                    <span class="ev-drag-handle" data-ev-id="${esc(ev.id||'')}"
-                      style="color:var(--border);font-size:16px;cursor:grab;flex-shrink:0;
+                    <span class="ev-drag-handle" data-ev-id="${evIdEsc}"
+                      style="color:var(--border);font-size:16px;${canDrag?'cursor:grab':'cursor:not-allowed;opacity:.35'};flex-shrink:0;
                         touch-action:none;user-select:none;padding:2px 3px;margin-top:2px;line-height:1"
-                      title="드래그하여 순서 변경">⠿</span>
+                      title="${canDrag?'드래그하여 순서 변경':(sortMode!=='manual'?'수동 모드에서만 드래그할 수 있어요':'필터를 해제하면 드래그할 수 있어요')}">⠿</span>
                     <div style="flex:1;min-width:0">
                       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
                         <span style="font-size:13px;font-weight:700;color:var(--gold)">${esc(ev.time||'')}</span>
+                        ${ev.sortKey !== undefined ? `<span style="font-size:11px;color:${sortMode==='time'?'var(--gold)':'var(--muted)'};${sortMode==='time'?'font-weight:700':''}">⏳ ${ev.sortKey}</span>` : ''}
                         <span style="font-size:11px;color:${IMP_COLOR[imp]};font-weight:700">${imp}</span>
+                        ${linkedCh ? `<button onclick="crJumpToChapter('${esc(linkedCh.id)}')"
+                          style="font-size:11px;color:var(--teal);background:var(--teal-light);border:none;padding:2px 8px;border-radius:10px;cursor:pointer;font-weight:600;font-family:'Noto Sans KR',sans-serif"
+                          title="이 회차로 이동">📖 ${esc(linkedCh.title||'(제목 없음)')}</button>` : ''}
                         ${ev.place?`<span style="font-size:11px;color:var(--muted)">📍 ${esc(ev.place)}</span>`:''}
-                        ${ev.chars?`<span style="font-size:11px;color:var(--muted)">👤 ${esc(ev.chars)}</span>`:''}
+                        ${charsStr?`<span style="font-size:11px;color:var(--muted)">👤 ${esc(charsStr)}</span>`:''}
                       </div>
                       <div style="font-size:14px;font-weight:600;margin-bottom:4px">${esc(ev.title||'')}</div>
                       ${ev.desc?`<div style="font-size:13px;color:var(--muted);white-space:pre-wrap;line-height:1.7">${esc(ev.desc)}</div>`:''}
                     </div>
                     <div style="display:flex;gap:6px;flex-shrink:0">
-                      <button onclick="showChronicleModal(${idx})" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✏️</button>
-                      <button onclick="deleteChronicle(${idx})" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--rust)">✕</button>
+                      <button onclick="showChronicleModal('${evIdEsc}')" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✏️</button>
+                      <button onclick="deleteChronicle('${evIdEsc}')" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--rust)">✕</button>
                     </div>
                   </div>
                 </div>
@@ -8682,38 +8789,60 @@ function renderChronicle() {
       }
     }, 0);
   }
-  // 드래그 활성화 (필터된 상태에선 비활성화 — 보이는 순서가 실제 순서와 다르면 혼란)
-  if (!hasAnyFilter && list.length >= 2) {
+  // 드래그 활성화 (수동 모드 + 필터 없을 때만)
+  if (canDrag) {
     setTimeout(initChronicleDrag, 30);
   }
 }
 
-function showChronicleModal(idx) {
+function showChronicleModal(id) {
   const p = getProject();
-  const ev = idx !== undefined ? p.chronicles[idx] : {};
+  const ev = id ? (p.chronicles||[]).find(e => e.id === id) : null;
+  const isEdit = !!ev;
+  const evData = ev || {};
   const chars = p.characters || [];
+  const selectedChars = _crCharsArr(evData);
   const IMPORTANCE = ['★★★ 핵심','★★ 중요','★ 일반'];
+  const idEsc = esc(id||'');
+  const chapters = (p.chapters||[]).filter(c => !c.isFolder);
+  const chOpts = chapters.map(c => {
+    const folder = (p.chapterFolders||[]).find(f => f.id === c.folderId);
+    const prefix = folder ? `[${folder.name}] ` : '';
+    return `<option value="${esc(c.id)}" ${evData.chapterId===c.id?'selected':''}>${prefix}${esc(c.title||'(제목 없음)')}</option>`;
+  }).join('');
   showModal(`
-    <div class="modal-title">${idx !== undefined ? '사건 수정' : '사건 추가'}</div>
+    <div class="modal-title">${isEdit ? '사건 수정' : '사건 추가'}</div>
     <div class="form-grid">
-      <div class="full"><label class="label">작품 내 시점 *
-        <span style="font-size:11px;color:var(--muted);font-weight:500">— 작품 세계의 시간축. 회차와 달라도 OK</span>
+      <div><label class="label">작품 내 시점 *
+        <span style="font-size:11px;color:var(--muted);font-weight:500">— 자유 표기</span>
       </label>
-        <input id="cr-time" value="${esc(ev.time||'')}" placeholder="예: D+3일, 즉위 5년 봄, 1부 3화 직후, 주인공 10세"></div>
+        <input id="cr-time" value="${esc(evData.time||'')}" placeholder="예: 즉위 5년 봄, D+3일"></div>
+      <div><label class="label">작중 연대순
+        <span style="font-size:11px;color:var(--muted);font-weight:500">— 정렬용 숫자 (선택)</span>
+      </label>
+        <input id="cr-sortkey" type="number" step="any" value="${evData.sortKey ?? ''}" placeholder="예: 1, 2, 2.5"></div>
       <div class="full"><label class="label">사건 제목 *</label>
-        <input id="cr-title" value="${esc(ev.title||'')}" placeholder="사건을 한 줄로 요약"></div>
+        <input id="cr-title" value="${esc(evData.title||'')}" placeholder="사건을 한 줄로 요약"></div>
       <div class="full"><label class="label">사건 내용</label>
-        <textarea id="cr-desc" rows="3" placeholder="자세한 내용 — 누가·어디서·무엇이 어떻게">${esc(ev.desc||'')}</textarea></div>
+        <textarea id="cr-desc" rows="3" placeholder="자세한 내용 — 누가·어디서·무엇이 어떻게">${esc(evData.desc||'')}</textarea></div>
       <div><label class="label">장소</label>
-        <input id="cr-place" value="${esc(ev.place||'')}" placeholder="예: 왕궁, 시장, 동굴"></div>
+        <input id="cr-place" value="${esc(evData.place||'')}" placeholder="예: 왕궁, 시장, 동굴"></div>
       <div><label class="label">중요도</label>
-        <select id="cr-importance">${IMPORTANCE.map(s=>`<option value="${s}" ${ev.importance===s?'selected':''}>${s}</option>`).join('')}</select></div>
+        <select id="cr-importance">${IMPORTANCE.map(s=>`<option value="${s}" ${evData.importance===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      ${chapters.length > 0 ? `
+      <div class="full"><label class="label">연결된 회차
+        <span style="font-size:11px;color:var(--muted);font-weight:500">— 본편에서 이 사건이 등장하는 회차 (선택사항)</span>
+      </label>
+        <select id="cr-chapter">
+          <option value="" ${!evData.chapterId?'selected':''}>— 연결 안 함 —</option>
+          ${chOpts}
+        </select></div>` : ''}
       <div class="full"><label class="label">관련 인물</label>
         ${chars.length===0
-          ? `<input id="cr-chars" value="${esc(ev.chars||'')}" placeholder="예: 영희, 철수">`
+          ? `<input id="cr-chars" value="${esc(selectedChars.join(', '))}" placeholder="예: 영희, 철수">`
           : `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--paper)">
               ${chars.map(c=>{
-                const sel=(ev.chars||'').split(',').map(s=>s.trim()).includes(c.name);
+                const sel=selectedChars.includes(c.name);
                 return `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;
                   padding:3px 8px;border-radius:20px;font-size:12px;font-weight:600;
                   border:1.5px solid ${sel?'var(--gold)':'var(--border)'};
@@ -8731,42 +8860,66 @@ function showChronicleModal(idx) {
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
-      <button class="btn btn-gold" onclick="saveChronicle(${idx})">저장</button>
+      <button class="btn btn-gold" onclick="saveChronicle('${idEsc}')">저장</button>
     </div>`);
   setTimeout(()=>document.getElementById('cr-time')?.focus(),100);
 }
 
-function saveChronicle(idx) {
+function saveChronicle(id) {
   const time = document.getElementById('cr-time').value.trim();
   const title = document.getElementById('cr-title').value.trim();
   if (!time||!title) { toast('시점과 제목을 입력해주세요.'); return; }
   const p = getProject();
   if (!p.chronicles) p.chronicles = [];
-  const checked = [...document.querySelectorAll('input[name="cr-chars-check"]:checked')].map(el=>el.value).join(', ');
-  const chars = checked || (document.getElementById('cr-chars')?.value||'');
-  // 신규면 기존 최대 order + 1, 수정이면 기존 값 유지
-  const defaultOrder = idx !== undefined
-    ? (p.chronicles[idx].order || 0)
-    : (p.chronicles.reduce((m, e) => Math.max(m, e.order||0), 0) + 1);
+
+  // 관련 인물 — 배열로 저장
+  const checkboxes = document.querySelectorAll('input[name="cr-chars-check"]');
+  let charsArr;
+  if (checkboxes.length > 0) {
+    charsArr = [...checkboxes].filter(el => el.checked).map(el => el.value);
+  } else {
+    const raw = document.getElementById('cr-chars')?.value || '';
+    charsArr = raw.split(',').map(s=>s.trim()).filter(Boolean);
+  }
+
+  const existingIdx = id ? p.chronicles.findIndex(e => e.id === id) : -1;
+  const isEdit = existingIdx >= 0;
+
+  const defaultOrder = isEdit
+    ? (p.chronicles[existingIdx].order || 0)
+    : (p.chronicles.reduce((m, e) => Math.max(m, e.order||0), 0) + 10);
+
+  // sortKey — 빈 값은 undefined, 아니면 숫자 파싱
+  const sortKeyRaw = document.getElementById('cr-sortkey')?.value?.trim() ?? '';
+  const sortKeyNum = sortKeyRaw === '' ? undefined : parseFloat(sortKeyRaw);
+  const sortKey = (sortKeyNum !== undefined && !isNaN(sortKeyNum)) ? sortKeyNum : undefined;
+
   const ev = {
-    id: idx !== undefined ? p.chronicles[idx].id : uid(),
-    time, title, desc: document.getElementById('cr-desc').value,
+    id: isEdit ? p.chronicles[existingIdx].id : uid(),
+    time, title,
+    desc: document.getElementById('cr-desc').value,
     place: document.getElementById('cr-place').value,
     importance: document.getElementById('cr-importance').value,
+    chapterId: document.getElementById('cr-chapter')?.value || '',
+    sortKey,
     order: defaultOrder,
-    chars
+    chars: charsArr,
   };
-  if (idx !== undefined) p.chronicles[idx] = ev;
+  // sortKey undefined 면 객체에서 제거 (깔끔한 직렬화)
+  if (sortKey === undefined) delete ev.sortKey;
+  if (isEdit) p.chronicles[existingIdx] = ev;
   else p.chronicles.push(ev);
   autoSave(); closeModal(); renderChronicle();
 }
 
-function deleteChronicle(idx) {
+function deleteChronicle(id) {
   const p = getProject();
-  const ev = p?.chronicles?.[idx];
+  const i = p?.chronicles?.findIndex(e => e.id === id) ?? -1;
+  if (i < 0) return;
+  const ev = p.chronicles[i];
   const title = ev?.title ? `"${ev.title}"` : '이 사건';
   confirmDialog(`${title}을(를) 삭제합니다.`, () => {
-    p.chronicles.splice(idx, 1);
+    p.chronicles.splice(i, 1);
     autoSave(); renderChronicle();
   });
 }
@@ -11992,8 +12145,17 @@ function pomoHideToast() {
         autoSave();
         if (typeof renderChapters === 'function') renderChapters();
       },
-      // commit — 이미 UI 에선 빠진 상태. 실제로 할 일 없음.
-      () => {}
+      // commit — 영구 삭제 확정 시점. 고아 참조 정리.
+      () => {
+        const proj = state.projects.find(pp => pp.id === projId);
+        if (!proj) return;
+        // 사건 일지에서 이 회차를 참조하던 chapterId 비움
+        let cleaned = 0;
+        (proj.chronicles || []).forEach(ev => {
+          if (ev.chapterId === id) { ev.chapterId = ''; cleaned++; }
+        });
+        if (cleaned > 0) autoSave();
+      }
     );
   };
 
