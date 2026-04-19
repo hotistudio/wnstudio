@@ -800,7 +800,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 <div id="app">
   <!-- HEADER -->
   <header id="header">
-    <button id="header-title" onclick="goHome()">호필 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.4.16 beta</span></button>
+    <button id="header-title" onclick="goHome()">호필 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.4.17 beta</span></button>
     <button class="header-btn" id="menu-toggle" onclick="toggleSidebar()" style="display:none;padding:6px 8px">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- 왼쪽 세로선 -->
@@ -1501,7 +1501,7 @@ function renderHome() {
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
         <p style="font-size:11px;color:var(--muted);opacity:.6;line-height:1.8">
-          호필 스튜디오 v0.4.16 beta · © 2026 호백<br>
+          호필 스튜디오 v0.4.17 beta · © 2026 호백<br>
           <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
             style="color:var(--muted);text-decoration:none;opacity:.8">CC BY-NC 4.0</a>
           · 비상업적 목적에 한해 자유롭게 사용 가능<br>
@@ -2134,6 +2134,12 @@ function deleteRelation(i) {
 function renderWorld() {
   const p = getProject();
   const items = p.worldSettings || [];
+  // worldTimeline id 보정
+  if (p.worldTimeline) {
+    let _fixed = false;
+    p.worldTimeline.forEach(e => { if (!e.id) { e.id = uid(); _fixed = true; } });
+    if (_fixed) autoSave();
+  }
   const events = (p.worldTimeline || []).slice().sort((a,b) => (a.year||0) - (b.year||0));
   const cats = getWorldCats(p.genre);
   const grouped = {};
@@ -2187,7 +2193,7 @@ function renderWorld() {
       group.forEach(({ev, ei}, si) => {
         const color = TL_COLOR_MAP[ev.type] || TL_COLOR_MAP['기타'];
         const dotTop = LINE_Y + 8 + si * (DOT + GAP);
-        const origIdx = (p.worldTimeline||[]).findIndex(e => e.id === ev.id);
+        const evIdEsc = esc(ev.id||'');
         nodesHtml += `
           <button class="tl-node" data-ei="${ei}"
             style="position:absolute;left:${pct}%;top:${dotTop - (TOUCH-DOT)/2}px;
@@ -2197,7 +2203,7 @@ function renderWorld() {
               background:transparent;border:none;
               cursor:pointer;z-index:2;padding:0;-webkit-tap-highlight-color:transparent;"
             title="${esc(ev.title)}"
-            onclick="toggleTlDetail('tld-${origIdx}')">
+            onclick="toggleTlDetail('tld-${evIdEsc}')">
             <div style="width:${DOT}px;height:${DOT}px;border-radius:50%;
               background:${color};border:2px solid var(--paper);
               box-shadow:0 2px 6px var(--shadow);pointer-events:none;
@@ -2226,17 +2232,17 @@ function renderWorld() {
         <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px">
           ${events.map((ev, ei) => {
             const color = TL_COLOR_MAP[ev.type] || TL_COLOR_MAP['기타'];
-            const origIdx = (p.worldTimeline||[]).findIndex(e => e.id === ev.id);
+            const evIdEsc = esc(ev.id||'');
             return `
-            <div id="tld-${origIdx}" style="display:none;border:1.5px solid ${color};border-radius:10px;overflow:hidden">
+            <div id="tld-${evIdEsc}" style="display:none;border:1.5px solid ${color};border-radius:10px;overflow:hidden">
               <div style="padding:10px 14px;background:${color}18;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
                 <div>
                   <span style="font-weight:700;font-size:14px;color:${color}">${esc(ev.title)}</span>
                   <span style="font-size:11px;color:var(--muted);margin-left:8px">${esc(ev.yearLabel||String(ev.year))} · ${esc(ev.type)}</span>
                 </div>
                 <div style="display:flex;gap:6px">
-                  <button class="btn btn-outline btn-sm" onclick="showTimelineModal(${origIdx})" style="font-size:11px">✏️ 수정</button>
-                  <button class="btn btn-danger btn-sm" onclick="deleteTimeline(${origIdx})" style="font-size:11px">🗑️ 삭제</button>
+                  <button class="btn btn-outline btn-sm" onclick="showTimelineModal('${evIdEsc}')" style="font-size:11px">✏️ 수정</button>
+                  <button class="btn btn-danger btn-sm" onclick="deleteTimeline('${evIdEsc}')" style="font-size:11px">🗑️ 삭제</button>
                 </div>
               </div>
               <div style="padding:10px 14px;font-size:13px;line-height:1.7">
@@ -2334,36 +2340,38 @@ function toggleTlDetail(id) {
 
 // 타임라인
 const TL_TYPES = ['전쟁','정치','재앙','문화','종교','경제','기타'];
-function showTimelineModal(idx) {
+function showTimelineModal(id) {
   const p = getProject();
-  const ev = idx !== undefined ? (p.worldTimeline||[])[idx] : {};
-  const chars = (p.characters||[]).map(c=>c.name).join(', ');
+  const ev = id ? (p.worldTimeline||[]).find(e => e.id === id) : null;
+  const isEdit = !!ev;
+  const evData = ev || {};
+  const idEsc = esc(id||'');
   showModal(`
-    <div class="modal-title">${idx !== undefined ? '사건 수정' : '사건 추가'}</div>
+    <div class="modal-title">${isEdit ? '사건 수정' : '사건 추가'}</div>
     <div class="form-grid">
       <div><label class="label">표시 연도/시기 *</label>
-        <input id="tl-year" value="${esc(ev.yearLabel||String(ev.year??''))}" placeholder="예: 건국 3년차, 300년 전, B.C 12"></div>
+        <input id="tl-year" value="${esc(evData.yearLabel||String(evData.year??''))}" placeholder="예: 건국 3년차, 300년 전, B.C 12"></div>
       <div><label class="label">정렬 순서 (숫자) *<span style="font-size:10px;color:var(--muted);font-weight:400"> 작을수록 왼쪽</span></label>
-        <input id="tl-order" type="number" value="${ev.year??''}" placeholder="예: -300, 1, 100"></div>
+        <input id="tl-order" type="number" value="${evData.year??''}" placeholder="예: -300, 1, 100"></div>
       <div><label class="label">사건 종류</label>
-        <select id="tl-type">${TL_TYPES.map(t=>`<option value="${t}" ${ev.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <select id="tl-type">${TL_TYPES.map(t=>`<option value="${t}" ${evData.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div class="full"><label class="label">사건명 *</label>
-        <input id="tl-title" value="${esc(ev.title||'')}" placeholder="사건 이름"></div>
+        <input id="tl-title" value="${esc(evData.title||'')}" placeholder="사건 이름"></div>
       <div class="full"><label class="label">설명</label>
-        <textarea id="tl-desc" rows="3" placeholder="사건의 내용과 결과">${esc(ev.desc||'')}</textarea></div>
+        <textarea id="tl-desc" rows="3" placeholder="사건의 내용과 결과">${esc(evData.desc||'')}</textarea></div>
       <div><label class="label">관련 인물</label>
-        <input id="tl-chars" value="${esc(ev.chars||'')}" placeholder="예: 영희, 철수"></div>
+        <input id="tl-chars" value="${esc(evData.chars||'')}" placeholder="예: 영희, 철수"></div>
       <div><label class="label">관련 장소</label>
-        <input id="tl-place" value="${esc(ev.place||'')}" placeholder="예: 수도 아르켄"></div>
+        <input id="tl-place" value="${esc(evData.place||'')}" placeholder="예: 수도 아르켄"></div>
     </div>
     <div class="modal-footer">
-      ${idx !== undefined ? `<button class="btn btn-danger btn-sm" onclick="deleteTimeline(${idx})">삭제</button>` : ''}
+      ${isEdit ? `<button class="btn btn-danger btn-sm" onclick="deleteTimeline('${idEsc}')">삭제</button>` : ''}
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
-      <button class="btn btn-gold" onclick="saveTimeline(${idx})">저장</button>
+      <button class="btn btn-gold" onclick="saveTimeline('${idEsc}')">저장</button>
     </div>`, false);
   setTimeout(() => document.getElementById('tl-year')?.focus(), 100);
 }
-function saveTimeline(idx) {
+function saveTimeline(id) {
   const title = document.getElementById('tl-title').value.trim();
   const yearRaw = document.getElementById('tl-year').value.trim();
   const orderRaw = document.getElementById('tl-order').value.trim();
@@ -2371,20 +2379,25 @@ function saveTimeline(idx) {
   const yearNum = parseFloat(orderRaw);
   const p = getProject();
   if (!p.worldTimeline) p.worldTimeline = [];
+  const existingIdx = id ? p.worldTimeline.findIndex(e => e.id === id) : -1;
+  const isEdit = existingIdx >= 0;
   const ev = {
-    id: idx !== undefined ? p.worldTimeline[idx].id : uid(),
+    id: isEdit ? p.worldTimeline[existingIdx].id : uid(),
     year: yearNum, yearLabel: yearRaw, title,
     type: document.getElementById('tl-type').value,
     desc: document.getElementById('tl-desc').value,
     chars: document.getElementById('tl-chars').value,
     place: document.getElementById('tl-place').value,
   };
-  if (idx !== undefined) p.worldTimeline[idx] = ev;
+  if (isEdit) p.worldTimeline[existingIdx] = ev;
   else p.worldTimeline.push(ev);
   autoSave(); closeModal(); renderWorld();
 }
-function deleteTimeline(idx) {
-  getProject().worldTimeline.splice(idx, 1);
+function deleteTimeline(id) {
+  const p = getProject();
+  const i = p?.worldTimeline?.findIndex(e => e.id === id) ?? -1;
+  if (i < 0) return;
+  p.worldTimeline.splice(i, 1);
   autoSave(); closeModal(); renderWorld();
   toast('사건을 삭제했어요.');
 }
@@ -4582,6 +4595,13 @@ function renderMemoFull() {
 
 function renderMemoList() {
   const memos = getMemos();
+  // id 보정
+  const p = getProject();
+  if (p?.memos) {
+    let _fixed = false;
+    p.memos.forEach(m => { if (!m.id) { m.id = uid(); _fixed = true; } });
+    if (_fixed) saveMemos();
+  }
   const q = (window._memoSearch || '').trim().toLowerCase();
   const clearBtn = document.getElementById('memo-search-clear');
   if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
@@ -4591,7 +4611,7 @@ function renderMemoList() {
     grid.innerHTML = '<div class="card empty-state"><div class="emoji">📝</div><p>메모를 추가해보세요.<br>아이디어, 설정, 대사 등 뭐든 자유롭게!</p></div>';
     return;
   }
-  const shown = memos.map((m,i) => ({m,i})).filter(({m}) =>
+  const shown = memos.filter(m =>
     !q ||
     (m.title||'').toLowerCase().includes(q) ||
     (m.content||'').toLowerCase().includes(q)
@@ -4599,7 +4619,7 @@ function renderMemoList() {
   if (shown.length === 0) {
     grid.innerHTML = '<div class="card empty-state"><div class="emoji">🔍</div><p>검색 결과가 없어요.</p></div>';
   } else {
-    grid.innerHTML = '<div class="memo-grid">' + shown.map(({m,i}) => renderMemoCard(m, i, q)).join('') + '</div>';
+    grid.innerHTML = '<div class="memo-grid">' + shown.map(m => renderMemoCard(m, q)).join('') + '</div>';
   }
 }
 
@@ -4632,8 +4652,9 @@ function renderMemo() {
   renderMemoList();
 }
 
-function renderMemoCard(m, i, q='') {
+function renderMemoCard(m, q='') {
   const col = MEMO_COLORS.find(c=>c.bg===m.color) || MEMO_COLORS[0];
+  const mIdEsc = esc(m.id||'');
   // 검색어 하이라이트 (textarea는 HTML 렌더 안 되므로 미리보기용)
   const highlightedContent = q && m.content
     ? esc(m.content).replace(new RegExp(esc(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),
@@ -4643,12 +4664,12 @@ function renderMemoCard(m, i, q='') {
     <div class="memo-card" style="background:${col.bg};border-color:${col.border}">
       <div class="memo-card-header" style="border-color:${col.border};background:${col.bg}">
         <input class="memo-card-title" value="${esc(m.title||'')}"
-          oninput="updateMemo(${i},'title',this.value)" placeholder="제목"
+          oninput="updateMemo('${mIdEsc}','title',this.value)" placeholder="제목"
           style="color:#1a1208 !important;background:transparent !important">
         <div style="display:flex;align-items:center;gap:6px">
           <div class="memo-color-dot" style="background:${col.bg};border-color:${col.border}"
-            onclick="showMemoColorPicker(${i},this)"></div>
-          <button class="btn-icon" onclick="deleteMemo(${i})" style="color:#b5451b !important;width:28px;height:28px">
+            onclick="showMemoColorPicker('${mIdEsc}',this)"></div>
+          <button class="btn-icon" onclick="deleteMemo('${mIdEsc}')" style="color:#b5451b !important;width:28px;height:28px">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b5451b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
         </div>
@@ -4657,7 +4678,7 @@ function renderMemoCard(m, i, q='') {
         ? `<div class="memo-card-body" style="color:#1a1208 !important;background:transparent !important;
             padding:10px 14px;font-size:13px;line-height:1.7;white-space:pre-wrap;min-height:80px">${highlightedContent}</div>`
         : `<textarea class="memo-card-body" rows="6"
-            oninput="updateMemo(${i},'content',this.value)"
+            oninput="updateMemo('${mIdEsc}','content',this.value)"
             placeholder="자유롭게 메모하세요..."
             style="color:#1a1208 !important;background:transparent !important">${esc(m.content||'')}</textarea>`}
       <div style="padding:6px 14px 10px;font-size:10px;color:rgba(0,0,0,.4) !important">
@@ -4680,24 +4701,28 @@ function addMemo() {
   setTimeout(() => document.querySelector('.memo-card-title')?.focus(), 100);
 }
 
-function updateMemo(i, key, val) {
+function updateMemo(id, key, val) {
   const p = getProject();
-  if (!p.memos?.[i]) return;
-  p.memos[i][key] = val;
-  p.memos[i].updatedAt = new Date().toISOString();
+  const m = p?.memos?.find(x => x.id === id);
+  if (!m) return;
+  m[key] = val;
+  m.updatedAt = new Date().toISOString();
   clearTimeout(window._memoSaveTimer);
   window._memoSaveTimer = setTimeout(saveMemos, 600);
 }
 
-function deleteMemo(i) {
+function deleteMemo(id) {
+  const p = getProject();
+  const i = p?.memos?.findIndex(m => m.id === id) ?? -1;
+  if (i < 0) return;
   confirmDialog('이 메모를 삭제합니다.', () => {
-    getProject().memos.splice(i, 1);
+    p.memos.splice(i, 1);
     saveMemos(); renderMemoFull();
     toast('메모를 삭제했어요.');
   });
 }
 
-function showMemoColorPicker(i, dotEl) {
+function showMemoColorPicker(id, dotEl) {
   const existing = document.getElementById('memo-color-picker');
   if (existing) { existing.remove(); return; }
   const picker = document.createElement('div');
@@ -4707,8 +4732,9 @@ function showMemoColorPicker(i, dotEl) {
     background:var(--white);border:1px solid var(--border);border-radius:10px;
     padding:10px;box-shadow:0 4px 20px var(--shadow);z-index:9000;
     display:flex;gap:8px;flex-wrap:wrap;width:180px`;
+  const idEsc = esc(id||'');
   picker.innerHTML = MEMO_COLORS.map(c => `
-    <div onclick="setMemoColor(${i},'${c.bg}');document.getElementById('memo-color-picker')?.remove()"
+    <div onclick="setMemoColor('${idEsc}','${c.bg}');document.getElementById('memo-color-picker')?.remove()"
       title="${c.label}"
       style="width:28px;height:28px;border-radius:50%;background:${c.bg};
         border:2px solid ${c.border};cursor:pointer;transition:transform .15s"
@@ -4719,10 +4745,11 @@ function showMemoColorPicker(i, dotEl) {
   setTimeout(() => document.addEventListener('click', () => picker.remove(), {once:true}), 50);
 }
 
-function setMemoColor(i, color) {
+function setMemoColor(id, color) {
   const p = getProject();
-  if (!p.memos?.[i]) return;
-  p.memos[i].color = color;
+  const m = p?.memos?.find(x => x.id === id);
+  if (!m) return;
+  m.color = color;
   saveMemos(); renderMemoFull();
 }
 
@@ -6498,7 +6525,7 @@ function refreshSplitItems() {
         if (!col) {
           html += list.map(it => {
             const rarity = ITEM_RARITIES.find(r=>r.label===it.rarity)||ITEM_RARITIES[0];
-            const itIdx = (p.items||[]).indexOf(it);
+            const itIdEsc = esc(it.id||'');
             return '<div style="border:1px solid var(--border);border-radius:8px;margin-top:4px;overflow:hidden;border-left:3px solid ' + rarity.color + '">'
               + '<div style="padding:7px 10px"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px">'
               + '<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;flex-wrap:wrap">'
@@ -6506,7 +6533,7 @@ function refreshSplitItems() {
               + '<span style="font-size:10px;color:' + rarity.color + ';font-weight:700">' + (it.rarity||'일반') + '</span></div>'
               + (it.desc ? '<div style="font-size:12px;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">' + esc(it.desc) + '</div>' : '')
               + (it.chars ? '<div style="font-size:11px;color:var(--teal);margin-top:2px">👤 ' + esc(it.chars) + '</div>' : '')
-              + '</div><button onclick="showItemModal(' + itIdx + ');" style="flex-shrink:0;background:none;border:none;cursor:pointer;font-size:13px;color:var(--muted);padding:2px 4px;line-height:1">✏️</button>'
+              + '</div><button onclick="showItemModal(\'' + itIdEsc + '\');" style="flex-shrink:0;background:none;border:none;cursor:pointer;font-size:13px;color:var(--muted);padding:2px 4px;line-height:1">✏️</button>'
               + '</div></div></div>';
           }).join('');
         }
@@ -8088,6 +8115,10 @@ function renderForeshadow() {
   const p = getProject();
   if (!p) return;
   if (!p.foreshadows) p.foreshadows = [];
+  // id 없는 레거시 항목 보정
+  let _idFixed = false;
+  p.foreshadows.forEach(f => { if (!f.id) { f.id = uid(); _idFixed = true; } });
+  if (_idFixed) autoSave();
   const list = p.foreshadows;
   if (!window._fsFilter)     window._fsFilter = '전체';
   if (!window._fsCharFilter) window._fsCharFilter = '전체';
@@ -8179,7 +8210,7 @@ function renderForeshadow() {
       ${filtered.length === 0
         ? `<div class="card empty-state"><div class="emoji">🎯</div><p>${total===0?'복선을 추가해보세요.':'해당하는 복선이 없어요.'}</p></div>`
         : filtered.map(f => {
-          const idx = list.indexOf(f);
+          const fsIdEsc = esc(f.id||'');
           const st  = f.status || '미회수';
           const imp = f.importance || '';
           const tags = (f.tags||'').split(',').map(s=>s.trim()).filter(Boolean);
@@ -8199,7 +8230,7 @@ function renderForeshadow() {
                 <!-- 뱃지 행 -->
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
                   <!-- 상태 퀵 토글 -->
-                  <button onclick="foreshadowToggleStatus(${idx})"
+                  <button onclick="foreshadowToggleStatus('${fsIdEsc}')"
                     title="${nextStatus ? nextStatus+'(으)로 변경' : ''}"
                     style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;cursor:${nextStatus?'pointer':'default'};
                       background:${STATUS_BG[st]};color:${STATUS_COLOR[st]};border:none;
@@ -8220,16 +8251,16 @@ function renderForeshadow() {
                   background:var(--cream);border-radius:8px;padding:6px 10px;font-size:12px">
                   <span style="color:var(--muted)">🌱</span>
                   ${autoPlant
-                    ? `<button onclick="foreshadowJumpTo(${idx}, 'first')" style="background:none;border:none;cursor:pointer;padding:0;font-weight:600;color:var(--teal);font-family:'Noto Sans KR',sans-serif;text-decoration:underline;text-decoration-color:rgba(20,140,120,.3);text-underline-offset:3px">${esc(autoPlant)}</button>`
+                    ? `<button onclick="foreshadowJumpTo('${fsIdEsc}', 'first')" style="background:none;border:none;cursor:pointer;padding:0;font-weight:600;color:var(--teal);font-family:'Noto Sans KR',sans-serif;text-decoration:underline;text-decoration-color:rgba(20,140,120,.3);text-underline-offset:3px">${esc(autoPlant)}</button>`
                     : `<span style="font-weight:600;color:var(--ink)">${esc(showPlant||'?')}</span>`
                   }
                   <span style="color:var(--border);font-size:16px">→→→</span>
                   ${autoHarvest
-                    ? `<button onclick="foreshadowJumpTo(${idx}, 'last')" style="background:none;border:none;cursor:pointer;padding:0;font-weight:600;color:var(--teal);font-family:'Noto Sans KR',sans-serif;text-decoration:underline;text-decoration-color:rgba(20,140,120,.3);text-underline-offset:3px">${esc(autoHarvest)}</button>`
+                    ? `<button onclick="foreshadowJumpTo('${fsIdEsc}', 'last')" style="background:none;border:none;cursor:pointer;padding:0;font-weight:600;color:var(--teal);font-family:'Noto Sans KR',sans-serif;text-decoration:underline;text-decoration-color:rgba(20,140,120,.3);text-underline-offset:3px">${esc(autoHarvest)}</button>`
                     : `<span style="font-weight:600;color:${st==='회수완료'?'var(--teal)':'var(--ink)'}">${esc(showHarvest||'?')}</span>`
                   }
                   ${st==='회수완료'?'<span style="color:var(--teal)">✅</span>':''}
-                  ${mentionCount > 0 ? `<button onclick="foreshadowToggleMentions(${idx})" style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:12px;padding:2px 9px;cursor:pointer;font-size:11px;font-weight:600;color:var(--muted);font-family:'Noto Sans KR',sans-serif" title="중간 언급된 화 보기">💬 언급 ${mentionCount}</button>` : ''}
+                  ${mentionCount > 0 ? `<button onclick="foreshadowToggleMentions('${fsIdEsc}')" style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:12px;padding:2px 9px;cursor:pointer;font-size:11px;font-weight:600;color:var(--muted);font-family:'Noto Sans KR',sans-serif" title="중간 언급된 화 보기">💬 언급 ${mentionCount}</button>` : ''}
                 </div>
                 ${mentionCount > 0 && window._fsExpandMentions === f.id ? `
                 <div style="margin-bottom:8px;padding:8px 12px;background:var(--paper);border:1px dashed var(--border);border-radius:8px;font-size:12px">
@@ -8237,7 +8268,7 @@ function renderForeshadow() {
                   ${cls.mentioned.map((cid, mi) => `
                     <div style="display:flex;align-items:center;gap:6px;padding:3px 0">
                       <span style="color:var(--muted);font-size:10px">•</span>
-                      <button onclick="foreshadowJumpTo(${idx}, 'mention', ${mi})" style="background:none;border:none;cursor:pointer;padding:0;color:var(--ink);font-family:'Noto Sans KR',sans-serif;text-align:left;font-size:12px">${esc(chapterLabel(cid))}</button>
+                      <button onclick="foreshadowJumpTo('${fsIdEsc}', 'mention', ${mi})" style="background:none;border:none;cursor:pointer;padding:0;color:var(--ink);font-family:'Noto Sans KR',sans-serif;text-align:left;font-size:12px">${esc(chapterLabel(cid))}</button>
                     </div>
                   `).join('')}
                 </div>` : ''}
@@ -8247,9 +8278,9 @@ function renderForeshadow() {
                   border-left:3px solid var(--border);padding-left:8px;white-space:pre-wrap">💡 ${esc(f.hint)}</div>`:''}
               </div>
               <div style="display:flex;gap:4px;flex-shrink:0">
-                <button onclick="showForeshadowModal(${idx})"
+                <button onclick="showForeshadowModal('${fsIdEsc}')"
                   style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted)">✏️</button>
-                <button onclick="deleteForeshadow(${idx})"
+                <button onclick="deleteForeshadow('${fsIdEsc}')"
                   style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--rust)">✕</button>
               </div>
             </div>
@@ -8259,9 +8290,9 @@ function renderForeshadow() {
 
 // 복선 카드 → 본문의 해당 태그 위치로 이동
 // kind: 'first' = 첫 등장(심기), 'last' = 마지막 등장(회수), 'mention' = 중간 언급 n번째
-function foreshadowJumpTo(idx, kind, mentionIdx) {
+function foreshadowJumpTo(id, kind, mentionIdx) {
   const p = getProject();
-  const f = p?.foreshadows?.[idx];
+  const f = p?.foreshadows?.find(x => x.id === id);
   if (!f || !f.tagName) return;
   const fsIndex = buildForeshadowIndex();
   const entry = fsIndex.byName[f.tagName.trim()];
@@ -8302,18 +8333,18 @@ function foreshadowJumpTo(idx, kind, mentionIdx) {
   }, 120);
 }
 
-function foreshadowToggleMentions(idx) {
+function foreshadowToggleMentions(id) {
   const p = getProject();
-  const f = p?.foreshadows?.[idx];
+  const f = p?.foreshadows?.find(x => x.id === id);
   if (!f) return;
   if (window._fsExpandMentions === f.id) window._fsExpandMentions = null;
   else window._fsExpandMentions = f.id;
   renderForeshadow();
 }
 
-function foreshadowToggleStatus(idx) {
+function foreshadowToggleStatus(id) {
   const p = getProject();
-  const f = p.foreshadows[idx];
+  const f = p?.foreshadows?.find(x => x.id === id);
   if (!f) return;
   if (f.status === '미회수') f.status = '회수완료';
   else if (f.status === '회수완료') f.status = '미회수';
@@ -8322,48 +8353,51 @@ function foreshadowToggleStatus(idx) {
   renderForeshadow();
 }
 
-function showForeshadowModal(idx) {
+function showForeshadowModal(id) {
   const p = getProject();
-  const f = idx !== undefined ? p.foreshadows[idx] : {};
+  const f = id ? (p.foreshadows||[]).find(x => x.id === id) : null;
+  const isEdit = !!f;
+  const fData = f || {};
   const chars = p.characters || [];
   const STATUS = ['미회수','회수완료'];
   const IMP = ['','★ 일반','★★ 중요','★★★ 핵심'];
-  const selChars = (f.chars||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const selChars = (fData.chars||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const idEsc = esc(id||'');
   // 기존 복선 인덱스 (자동 계산 정보용)
   const fsIndex = buildForeshadowIndex();
-  const cls = classifyForeshadowChapters(f, fsIndex);
+  const cls = classifyForeshadowChapters(fData, fsIndex);
   const isLinked = cls.linked;
   const linkHint = isLinked
     ? `<span style="color:var(--teal);font-weight:700">🔗 본문 연결됨</span> · ${cls.planted ? '심기: '+esc(chapterLabel(cls.planted)) : ''}${cls.harvested ? ' · 회수: '+esc(chapterLabel(cls.harvested)) : ''}`
-    : (f.tagName ? `<span style="color:var(--muted)">본문에 <code>[[복선:${esc(f.tagName)}]]</code> 태그가 아직 없어요</span>` : '');
+    : (fData.tagName ? `<span style="color:var(--muted)">본문에 <code>[[복선:${esc(fData.tagName)}]]</code> 태그가 아직 없어요</span>` : '');
 
   showModal(`
-    <div class="modal-title">${idx !== undefined ? '복선 수정' : '복선 추가'}</div>
+    <div class="modal-title">${isEdit ? '복선 수정' : '복선 추가'}</div>
     <div class="form-grid">
       <div class="full"><label class="label">복선 내용 *</label>
-        <textarea id="fs-content" rows="3" placeholder="어떤 복선인지 적어주세요">${esc(f.content||'')}</textarea></div>
+        <textarea id="fs-content" rows="3" placeholder="어떤 복선인지 적어주세요">${esc(fData.content||'')}</textarea></div>
       <div class="full">
         <label class="label">태그 이름
           <span style="font-size:11px;color:var(--muted);font-weight:500">— 본문에 <code style="background:var(--cream);padding:1px 5px;border-radius:3px">[[복선:이름]]</code>으로 심으면 자동 추적</span>
         </label>
-        <input id="fs-tagname" value="${esc(f.tagName||'')}" placeholder="예: 검의 정체, 왕의 비밀" autocomplete="off">
+        <input id="fs-tagname" value="${esc(fData.tagName||'')}" placeholder="예: 검의 정체, 왕의 비밀" autocomplete="off">
         <div id="fs-tag-status" style="font-size:11px;margin-top:5px;min-height:14px">${linkHint}</div>
       </div>
       <div><label class="label">뿌린 화/장면 <span style="font-size:10px;color:var(--muted)">(수동 입력)</span></label>
-        <input id="fs-plant" value="${esc(f.plant||'')}" placeholder="예: 3화, 1부 2장"></div>
+        <input id="fs-plant" value="${esc(fData.plant||'')}" placeholder="예: 3화, 1부 2장"></div>
       <div><label class="label">회수 화/장면 <span style="font-size:10px;color:var(--muted)">(수동 입력)</span></label>
-        <input id="fs-harvest" value="${esc(f.harvest||'')}" placeholder="예: 15화"></div>
+        <input id="fs-harvest" value="${esc(fData.harvest||'')}" placeholder="예: 15화"></div>
       <div><label class="label">상태</label>
-        <select id="fs-status">${STATUS.map(s=>`<option value="${s}" ${(f.status||'미회수')===s?'selected':''}>${s}</option>`).join('')}</select></div>
+        <select id="fs-status">${STATUS.map(s=>`<option value="${s}" ${(fData.status||'미회수')===s?'selected':''}>${s}</option>`).join('')}</select></div>
       <div><label class="label">중요도</label>
-        <select id="fs-importance">${IMP.map(s=>`<option value="${s}" ${(f.importance||'')===s?'selected':''}>${s||'없음'}</option>`).join('')}</select></div>
+        <select id="fs-importance">${IMP.map(s=>`<option value="${s}" ${(fData.importance||'')===s?'selected':''}>${s||'없음'}</option>`).join('')}</select></div>
       <div class="full"><label class="label">태그 <span style="font-size:11px;color:var(--muted)">(쉼표로 구분)</span></label>
-        <input id="fs-tags" value="${esc(f.tags||'')}" placeholder="예: 정체, 마법, 가족"></div>
+        <input id="fs-tags" value="${esc(fData.tags||'')}" placeholder="예: 정체, 마법, 가족"></div>
       <div class="full"><label class="label">힌트/메모</label>
-        <textarea id="fs-hint" rows="2" placeholder="이 복선을 어떻게 회수할지, 관련 아이디어...">${esc(f.hint||'')}</textarea></div>
+        <textarea id="fs-hint" rows="2" placeholder="이 복선을 어떻게 회수할지, 관련 아이디어...">${esc(fData.hint||'')}</textarea></div>
       <div class="full"><label class="label">관련 인물</label>
         ${chars.length===0
-          ? `<input id="fs-chars" value="${esc(f.chars||'')}" placeholder="예: 영희, 철수">`
+          ? `<input id="fs-chars" value="${esc(fData.chars||'')}" placeholder="예: 영희, 철수">`
           : `<select id="fs-chars-select" multiple
               style="width:100%;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;
                 background:var(--paper);color:var(--ink);font-family:'Noto Sans KR',sans-serif;
@@ -8375,7 +8409,7 @@ function showForeshadowModal(idx) {
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
-      <button class="btn btn-gold" onclick="saveForeshadow(${idx})">저장</button>
+      <button class="btn btn-gold" onclick="saveForeshadow('${idEsc}')">저장</button>
     </div>`);
   setTimeout(()=>document.getElementById('fs-content')?.focus(),100);
 
@@ -8398,19 +8432,21 @@ function showForeshadowModal(idx) {
   }
 }
 
-function saveForeshadow(idx) {
+function saveForeshadow(id) {
   const content = document.getElementById('fs-content').value.trim();
   if (!content) { toast('복선 내용을 입력해주세요.'); return; }
   const p = getProject();
   if (!p.foreshadows) p.foreshadows = [];
+  const existingIdx = id ? p.foreshadows.findIndex(x => x.id === id) : -1;
+  const isEdit = existingIdx >= 0;
   const sel = document.getElementById('fs-chars-select');
   const chars = sel
     ? [...sel.selectedOptions].map(o=>o.value).join(', ')
     : (document.getElementById('fs-chars')?.value||'');
   const tagName = (document.getElementById('fs-tagname')?.value||'').trim();
-  const oldTagName = (idx !== undefined ? (p.foreshadows[idx].tagName || '') : '').trim();
+  const oldTagName = (isEdit ? (p.foreshadows[existingIdx].tagName || '') : '').trim();
   const f = {
-    id: idx !== undefined ? p.foreshadows[idx].id : uid(),
+    id: isEdit ? p.foreshadows[existingIdx].id : uid(),
     content,
     tagName,
     plant:      document.getElementById('fs-plant').value,
@@ -8443,13 +8479,13 @@ function saveForeshadow(idx) {
         okColor: nameChanged ? 'var(--gold)' : 'var(--rust)',
         onOk: () => {
           renameForeshadowTagInContent(oldTagName, nameChanged ? tagName : null);
-          if (idx !== undefined) p.foreshadows[idx] = f;
+          if (isEdit) p.foreshadows[existingIdx] = f;
           else p.foreshadows.push(f);
           autoSave(); closeModal(); renderForeshadow();
         },
         onCancel: () => {
           // 본문은 그대로 두되 복선 데이터는 저장
-          if (idx !== undefined) p.foreshadows[idx] = f;
+          if (isEdit) p.foreshadows[existingIdx] = f;
           else p.foreshadows.push(f);
           autoSave(); closeModal(); renderForeshadow();
         },
@@ -8459,7 +8495,7 @@ function saveForeshadow(idx) {
     }
   }
 
-  if (idx !== undefined) p.foreshadows[idx] = f;
+  if (isEdit) p.foreshadows[existingIdx] = f;
   else p.foreshadows.push(f);
   autoSave(); closeModal(); renderForeshadow();
 }
@@ -8515,10 +8551,12 @@ function renameForeshadowTagInContent(oldName, newName) {
   return total;
 }
 
-function deleteForeshadow(idx) {
+function deleteForeshadow(id) {
+  const p = getProject();
+  const i = p?.foreshadows?.findIndex(x => x.id === id) ?? -1;
+  if (i < 0) return;
   confirmDialog('이 복선을 삭제합니다.', () => {
-    const p = getProject();
-    p.foreshadows.splice(idx, 1);
+    p.foreshadows.splice(i, 1);
     autoSave(); renderForeshadow();
   });
 }
@@ -9067,7 +9105,12 @@ function evDragCommit() {
 
 function renderItems() {
   const p = getProject();
-  const items = p.items || [];
+  if (!p.items) p.items = [];
+  // id 보정
+  let _fixed = false;
+  p.items.forEach(it => { if (!it.id) { it.id = uid(); _fixed = true; } });
+  if (_fixed) autoSave();
+  const items = p.items;
   const chars = p.characters || [];
 
   // 필터 상태
@@ -9230,7 +9273,7 @@ function renderItemGrid() {
     ? `<div class="card empty-state"><div class="emoji">📦</div><p>${items.length===0?'아이템을 추가해보세요.':'검색 결과가 없어요.'}</p></div>`
     : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
         ${filtered.map(it => {
-          const idx = items.indexOf(it);
+          const itIdEsc = esc(it.id||'');
           const rarity = ITEM_RARITIES.find(r=>r.label===it.rarity) || ITEM_RARITIES[0];
           return `
           <div class="card card-sm" style="padding:0;overflow:hidden;border-top:3px solid ${rarity.color};display:flex;flex-direction:column;cursor:default">
@@ -9252,10 +9295,10 @@ function renderItemGrid() {
               </div>
             </div>
             <div style="display:flex;border-top:1px solid var(--border)">
-              <button onclick="showItemModal(${idx})"
+              <button onclick="showItemModal('${itIdEsc}')"
                 style="flex:1;padding:7px;background:none;border:none;cursor:pointer;
                   font-size:12px;color:var(--teal);font-family:'Noto Sans KR',sans-serif">✏️ 수정</button>
-              <button onclick="deleteItem(${idx})"
+              <button onclick="deleteItem('${itIdEsc}')"
                 style="flex:1;padding:7px;background:none;border:none;cursor:pointer;
                   font-size:12px;color:var(--rust);font-family:'Noto Sans KR',sans-serif">🗑️ 삭제</button>
             </div>
@@ -9283,7 +9326,7 @@ function renderGlossaryCards() {
     ? `<div class="card empty-state"><div class="emoji">📖</div><p>${list.length===0?'용어를 추가해보세요.':'검색 결과가 없어요.'}</p></div>`
     : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">${
         filtered.map(g => {
-          const idx = list.indexOf(g);
+          const gIdEsc = esc(g.id||'');
           return `<div class="card card-sm" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
 
             <div style="padding:12px 14px;flex:1">
@@ -9298,8 +9341,8 @@ function renderGlossaryCards() {
               ${g.alias?`<p style="font-size:11px;color:var(--muted)">별칭: ${esc(g.alias)}</p>`:''}
             </div>
             <div style="display:flex;border-top:1px solid var(--border)">
-              <button onclick="showGlossaryModal(${idx})" style="flex:1;padding:7px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--teal);font-family:'Noto Sans KR',sans-serif">✏️ 수정</button>
-              <button onclick="deleteGlossary(${idx})" style="flex:1;padding:7px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--rust);font-family:'Noto Sans KR',sans-serif">🗑️ 삭제</button>
+              <button onclick="showGlossaryModal('${gIdEsc}')" style="flex:1;padding:7px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--teal);font-family:'Noto Sans KR',sans-serif">✏️ 수정</button>
+              <button onclick="deleteGlossary('${gIdEsc}')" style="flex:1;padding:7px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--rust);font-family:'Noto Sans KR',sans-serif">🗑️ 삭제</button>
             </div>
           </div>`;
         }).join('')
@@ -9320,7 +9363,12 @@ function renderGlossaryCards() {
 
 function renderGlossary() {
   const p = getProject();
-  const list = p.glossary || [];
+  if (!p.glossary) p.glossary = [];
+  // id 보정
+  let _fixed = false;
+  p.glossary.forEach(g => { if (!g.id) { g.id = uid(); _fixed = true; } });
+  if (_fixed) autoSave();
+  const list = p.glossary;
   if (!window._glossarySearch) window._glossarySearch = '';
   if (!window._glossaryCat)    window._glossaryCat = '전체';
   const cat = window._glossaryCat;
@@ -9371,15 +9419,20 @@ function renderGlossary() {
 
 function renderGlossaryPanelHtml() {
   const p = getProject();
-  const list = p.glossary || [];
+  if (!p.glossary) p.glossary = [];
+  // id 보정 (패널 먼저 진입하는 경우 대비)
+  let _fixed = false;
+  p.glossary.forEach(g => { if (!g.id) { g.id = uid(); _fixed = true; } });
+  if (_fixed) autoSave();
+  const list = p.glossary;
   if (!window._glossaryPanelQ) window._glossaryPanelQ = '';
   const q = window._glossaryPanelQ.trim().toLowerCase();
   const filtered = list.filter(g => !q || g.term.toLowerCase().includes(q) || (g.desc||'').toLowerCase().includes(q));
   const items = filtered.length === 0
     ? `<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px 0">용어가 없어요</div>`
     : filtered.map(g => {
-        const idx = list.indexOf(g);
-        return `<div style="background:var(--cream);border-radius:8px;padding:10px 12px;cursor:pointer;margin-bottom:6px" onclick="showGlossaryModal(${idx})">
+        const gIdEsc = esc(g.id||'');
+        return `<div style="background:var(--cream);border-radius:8px;padding:10px 12px;cursor:pointer;margin-bottom:6px" onclick="showGlossaryModal('${gIdEsc}')">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
             <span style="font-weight:700;font-size:13px">${esc(g.term)}</span>
             <span style="font-size:10px;color:var(--teal)">${esc(g.cat||'기타')}</span>
@@ -9403,43 +9456,51 @@ function renderGlossaryPanelHtml() {
   </div>`;
 }
 
-function showGlossaryModal(idx) {
+function showGlossaryModal(id) {
   const p = getProject();
-  const g = idx !== undefined ? (p.glossary||[])[idx] : {};
+  const g = id ? (p.glossary||[]).find(x => x.id === id) : null;
+  const isEdit = !!g;
+  const gData = g || {};
+  const idEsc = esc(id||'');
   showModal(`
-    <div class="modal-title">${idx !== undefined ? '용어 수정' : '용어 추가'}</div>
+    <div class="modal-title">${isEdit ? '용어 수정' : '용어 추가'}</div>
     <div class="form-grid">
       <div><label class="label">용어 *</label>
-        <input id="gl-term" value="${esc(g.term||'')}" placeholder="용어명"></div>
+        <input id="gl-term" value="${esc(gData.term||'')}" placeholder="용어명"></div>
       <div><label class="label">발음/표기</label>
-        <input id="gl-pron" value="${esc(g.pronunciation||'')}" placeholder="예: [마나], [아발론]"></div>
+        <input id="gl-pron" value="${esc(gData.pronunciation||'')}" placeholder="예: [마나], [아발론]"></div>
       <div><label class="label">카테고리</label>
-        <select id="gl-cat">${GLOSSARY_CATS.map(c=>`<option value="${c}" ${(g.cat||'기타')===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        <select id="gl-cat">${GLOSSARY_CATS.map(c=>`<option value="${c}" ${(gData.cat||'기타')===c?'selected':''}>${c}</option>`).join('')}</select></div>
       <div><label class="label">별칭/다른 이름</label>
-        <input id="gl-alias" value="${esc(g.alias||'')}" placeholder="예: 검은 마법사, 어둠의 군주"></div>
+        <input id="gl-alias" value="${esc(gData.alias||'')}" placeholder="예: 검은 마법사, 어둠의 군주"></div>
       <div class="full"><label class="label">설명 *</label>
-        <textarea id="gl-desc" rows="4" placeholder="이 용어에 대한 설명을 입력하세요">${esc(g.desc||'')}</textarea></div>
+        <textarea id="gl-desc" rows="4" placeholder="이 용어에 대한 설명을 입력하세요">${esc(gData.desc||'')}</textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
-      <button class="btn btn-gold" onclick="saveGlossary(${idx !== undefined ? idx : 'undefined'})">저장</button>
+      <button class="btn btn-gold" onclick="saveGlossary('${idEsc}')">저장</button>
     </div>`);
   setTimeout(() => document.getElementById('gl-term')?.focus(), 50);
 }
 
-function saveGlossary(idx) {
+function saveGlossary(id) {
   const p = getProject();
   if (!p.glossary) p.glossary = [];
   const term = document.getElementById('gl-term').value.trim();
   if (!term) { toast('용어를 입력해주세요.'); return; }
+  const existingIdx = id ? p.glossary.findIndex(x => x.id === id) : -1;
+  const isEdit = existingIdx >= 0;
   const entry = {
+    id: isEdit ? p.glossary[existingIdx].id : uid(),
     term,
     pronunciation: document.getElementById('gl-pron').value.trim(),
     cat: document.getElementById('gl-cat').value,
     alias: document.getElementById('gl-alias').value.trim(),
     desc: document.getElementById('gl-desc').value.trim(),
+    // 기존 related 같은 추가 필드 보존
+    ...(isEdit ? { related: p.glossary[existingIdx].related } : {}),
   };
-  if (idx !== undefined && idx !== 'undefined') p.glossary[idx] = entry;
+  if (isEdit) p.glossary[existingIdx] = entry;
   else p.glossary.push(entry);
   // 가나다순 정렬
   p.glossary.sort((a,b) => a.term.localeCompare(b.term, 'ko'));
@@ -9451,10 +9512,12 @@ function saveGlossary(idx) {
   toast('용어가 저장됐어요 📖');
 }
 
-function deleteGlossary(idx) {
+function deleteGlossary(id) {
+  const p = getProject();
+  const i = p?.glossary?.findIndex(x => x.id === id) ?? -1;
+  if (i < 0) return;
   confirmDialog('이 용어를 삭제할까요?', () => {
-    const p = getProject();
-    p.glossary.splice(idx, 1);
+    p.glossary.splice(i, 1);
     autoSave();
     renderGlossary();
     updateBadges();
@@ -9911,56 +9974,61 @@ function gsJumpTo(idx) {
 }
 
 
-function showItemModal(idx) {
+function showItemModal(id) {
   const p = getProject();
-  const it = idx !== undefined ? (p.items||[])[idx] : {};
+  const it = id ? (p.items||[]).find(x => x.id === id) : null;
+  const isEdit = !!it;
+  const itData = it || {};
   const chars = p.characters || [];
+  const idEsc = esc(id||'');
   showModal(`
-    <div class="modal-title">${idx !== undefined ? '아이템 수정' : '아이템 추가'}</div>
+    <div class="modal-title">${isEdit ? '아이템 수정' : '아이템 추가'}</div>
     <div class="form-grid">
       <div><label class="label">아이템명 *</label>
-        <input id="it-name" value="${esc(it.name||'')}" placeholder="아이템 이름"></div>
+        <input id="it-name" value="${esc(itData.name||'')}" placeholder="아이템 이름"></div>
       <div><label class="label">카테고리</label>
-        <select id="it-cat">${ITEM_GROUPS.map(g=>`<optgroup label="${g.group}">${g.cats.map(c=>`<option value="${c}" ${it.cat===c?'selected':''}>${c}</option>`).join('')}</optgroup>`).join('')}</select></div>
+        <select id="it-cat">${ITEM_GROUPS.map(g=>`<optgroup label="${g.group}">${g.cats.map(c=>`<option value="${c}" ${itData.cat===c?'selected':''}>${c}</option>`).join('')}</optgroup>`).join('')}</select></div>
       <div><label class="label">희귀도/등급</label>
-        <select id="it-rarity">${ITEM_RARITIES.map(r=>`<option value="${r.label}" ${it.rarity===r.label?'selected':''}>${r.label}</option>`).join('')}</select></div>
+        <select id="it-rarity">${ITEM_RARITIES.map(r=>`<option value="${r.label}" ${itData.rarity===r.label?'selected':''}>${r.label}</option>`).join('')}</select></div>
       <div class="full"><label class="label">설명</label>
-        <textarea id="it-desc" rows="3" placeholder="아이템의 외형, 효과, 특징 등">${esc(it.desc||'')}</textarea></div>
+        <textarea id="it-desc" rows="3" placeholder="아이템의 외형, 효과, 특징 등">${esc(itData.desc||'')}</textarea></div>
       <div class="full"><label class="label">관련 인물</label>
         ${chars.length === 0
-          ? `<input id="it-chars" value="${esc(it.chars||'')}" placeholder="예: 영희, 철수">`
+          ? `<input id="it-chars" value="${esc(itData.chars||'')}" placeholder="예: 영희, 철수">`
           : `<select id="it-chars-select" multiple
               style="width:100%;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;
                 background:var(--paper);color:var(--ink);font-family:'Noto Sans KR',sans-serif;
                 font-size:13px;min-height:80px">
               ${chars.map(c => {
-                const selected = (it.chars||'').split(',').map(s=>s.trim()).includes(c.name);
+                const selected = (itData.chars||'').split(',').map(s=>s.trim()).includes(c.name);
                 return `<option value="${esc(c.name)}" ${selected?'selected':''}>${esc(c.name)}${c.role?` (${esc(c.role)})`:''}</option>`;
               }).join('')}
             </select>
             <div style="font-size:11px;color:var(--muted);margin-top:4px">Ctrl(또는 Cmd)을 누른 채 클릭하면 여러 명 선택할 수 있어요</div>`}
       </div>
       <div><label class="label">등장 챕터/장면</label>
-        <input id="it-chapter" value="${esc(it.chapter||'')}" placeholder="예: 3화, 1부 2장"></div>
+        <input id="it-chapter" value="${esc(itData.chapter||'')}" placeholder="예: 3화, 1부 2장"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
-      <button class="btn btn-gold" onclick="saveItem(${idx})">저장</button>
+      <button class="btn btn-gold" onclick="saveItem('${idEsc}')">저장</button>
     </div>`, false);
   setTimeout(() => document.getElementById('it-name')?.focus(), 100);
 }
 
-function saveItem(idx) {
+function saveItem(id) {
   const name = document.getElementById('it-name').value.trim();
   if (!name) { toast('아이템명을 입력해주세요.'); return; }
   const p = getProject();
   if (!p.items) p.items = [];
+  const existingIdx = id ? p.items.findIndex(x => x.id === id) : -1;
+  const isEdit = existingIdx >= 0;
   const sel = document.getElementById('it-chars-select');
   const charsVal = sel
     ? [...sel.selectedOptions].map(o=>o.value).join(', ')
     : (document.getElementById('it-chars')?.value || '');
   const it = {
-    id: idx !== undefined ? p.items[idx].id : uid(),
+    id: isEdit ? p.items[existingIdx].id : uid(),
     name,
     cat: document.getElementById('it-cat').value,
     rarity: document.getElementById('it-rarity').value,
@@ -9968,7 +10036,7 @@ function saveItem(idx) {
     chars: charsVal,
     chapter: document.getElementById('it-chapter').value,
   };
-  if (idx !== undefined) p.items[idx] = it;
+  if (isEdit) p.items[existingIdx] = it;
   else p.items.push(it);
   autoSave(); closeModal();
   const splitPanel = document.getElementById('split-panel');
@@ -9981,9 +10049,12 @@ function saveItem(idx) {
   }
 }
 
-function deleteItem(idx) {
+function deleteItem(id) {
+  const p = getProject();
+  const i = p?.items?.findIndex(x => x.id === id) ?? -1;
+  if (i < 0) return;
   confirmDialog('이 아이템을 삭제합니다.', () => {
-    getProject().items.splice(idx, 1);
+    p.items.splice(i, 1);
     autoSave(); renderItems(); toast('삭제했어요.');
   });
 }
