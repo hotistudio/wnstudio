@@ -3,7 +3,7 @@
 // 오프라인 지원 + 리소스 캐싱
 // ═══════════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'hopil-v0.4.19-20260426-0445';
+const CACHE_VERSION = 'hopil-v0.4.21-20260426-0930';
 const CACHE_NAME = `hopil-studio-${CACHE_VERSION}`;
 
 // 앱 셸 — 설치 시 미리 캐시할 리소스
