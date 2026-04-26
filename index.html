@@ -826,7 +826,7 @@ button{cursor:pointer;font-family:'Noto Sans KR',sans-serif;border:none;border-r
 <div id="app">
   <!-- HEADER -->
   <header id="header">
-    <button id="header-title" onclick="goHome()">호필 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.4.17 beta</span></button>
+    <button id="header-title" onclick="goHome()">호필 스튜디오 <span style="font-size:10px;font-weight:400;color:var(--gold2);letter-spacing:.5px;margin-left:2px">v0.4.19 beta</span></button>
     <button class="header-btn" id="menu-toggle" onclick="toggleSidebar()" style="display:none;padding:6px 8px">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- 왼쪽 세로선 -->
@@ -1064,7 +1064,7 @@ function loadFromStorage() {
 // ═══════════════════════════════════════════════════════════════
 // 현재 스키마 버전. 스키마를 바꿀 때마다 +1 하고 migrateProject 안에
 // 해당 버전용 블록을 추가한다. 멱등성을 지킬 것 (여러 번 실행해도 동일 결과).
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 
 /**
  * 가계도 스키마 v2 필드 정의 (참고용)
@@ -1134,6 +1134,37 @@ function migrateProject(p) {
   // 이후 버전이 생기면 여기 추가:
   // if (from < 3) { ... }
 
+  // v2 → v3: 가문 멤버 ↔ 등장인물 연결 (charId 필드 도입)
+  if (from < 3) {
+    if (Array.isArray(p.families) && Array.isArray(p.characters)) {
+      // 이름 → 인물 매핑 (동명이인은 첫 번째 사용)
+      const nameToChar = new Map();
+      p.characters.forEach(c => {
+        if (c && c.name && !nameToChar.has(c.name)) {
+          nameToChar.set(c.name, c);
+        }
+      });
+      p.families.forEach(f => {
+        if (!f || !f.groups) return;
+        Object.keys(f.groups).forEach(tab => {
+          const list = f.groups[tab];
+          if (!Array.isArray(list)) return;
+          list.forEach(m => {
+            if (!m || typeof m !== 'object') return;
+            // 기존 charId 보존, 없으면 이름으로 매칭 시도
+            if (typeof m.charId !== 'string') m.charId = '';
+            if (!m.charId && m.name && nameToChar.has(m.name)) {
+              const ch = nameToChar.get(m.name);
+              m.charId = ch.id;
+              // 인물의 familyId 도 비어 있으면 채워주기 (양방향 동기화)
+              if (!ch.familyId) ch.familyId = f.id;
+            }
+          });
+        });
+      });
+    }
+  }
+
   p.schemaVersion = CURRENT_SCHEMA_VERSION;
   return true;
 }
@@ -1160,6 +1191,18 @@ function cleanupCharacterReferences(p, removedId) {
       if (t.overrides && t.overrides[removedId]) delete t.overrides[removedId];
     });
   }
+  // 가문 멤버의 charId 참조도 끊기 (멤버 자체는 유지하되 연결 해제)
+  if (Array.isArray(p.families)) {
+    p.families.forEach(f => {
+      if (!f || !f.groups) return;
+      Object.values(f.groups).forEach(list => {
+        if (!Array.isArray(list)) return;
+        list.forEach(m => {
+          if (m && m.charId === removedId) m.charId = '';
+        });
+      });
+    });
+  }
 }
 
 /**
@@ -1183,8 +1226,58 @@ function cleanupFamilyReferences(p, removedFamilyId) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// RELATIONSHIP HELPERS (가계도 공통 유틸)
+// FAMILY ↔ CHARACTER 양방향 동기화 헬퍼
 // ═══════════════════════════════════════════════════════════════
+
+/** 가문 안에서 특정 charId 를 가진 멤버를 찾기 → {tab, idx} 또는 null */
+function findMemberByCharId(family, charId) {
+  if (!family || !family.groups || !charId) return null;
+  for (const tab of Object.keys(family.groups)) {
+    const list = family.groups[tab];
+    if (!Array.isArray(list)) continue;
+    const idx = list.findIndex(m => m && m.charId === charId);
+    if (idx !== -1) return { tab, idx };
+  }
+  return null;
+}
+
+/** 모든 가문에서 특정 charId 의 멤버를 제거 (해당 인물의 familyId 가 변경/제거될 때 호출) */
+function removeCharFromAllFamilies(p, charId) {
+  if (!p || !charId || !Array.isArray(p.families)) return;
+  p.families.forEach(f => {
+    if (!f || !f.groups) return;
+    Object.keys(f.groups).forEach(tab => {
+      const list = f.groups[tab];
+      if (!Array.isArray(list)) return;
+      f.groups[tab] = list.filter(m => !(m && m.charId === charId));
+    });
+  });
+}
+
+/** 인물을 가문의 특정 탭에 추가 (이미 다른 탭에 있으면 거기 유지). 없으면 새로 추가. */
+function addCharToFamily(p, charId, familyId, preferredTab) {
+  if (!p || !charId || !familyId) return;
+  const c = (p.characters || []).find(x => x.id === charId);
+  const f = (p.families || []).find(x => x.id === familyId);
+  if (!c || !f) return;
+  if (!f.groups) f.groups = {};
+  // 이미 이 가문 안에 있으면 그대로 둠
+  if (findMemberByCharId(f, charId)) return;
+  const tabs = (typeof getFamilyTabNames === 'function') ? getFamilyTabNames(f) : ['직계'];
+  const tab = (preferredTab && tabs.includes(preferredTab)) ? preferredTab : tabs[0];
+  if (!Array.isArray(f.groups[tab])) f.groups[tab] = [];
+  f.groups[tab].push({
+    charId: c.id,
+    name: c.name || '',
+    age: c.age || '',
+    gender: c.gender || '',
+    alive: c.alive || '생존',
+    relation: c.role || '',
+    note: '',
+  });
+}
+
+
 
 /** 인물의 조상 id Set 반환 (부모, 조부모 ...). 순환 방어 포함. */
 function getAncestorIds(p, charId) {
@@ -2478,7 +2571,7 @@ function renderHome() {
       <div style="text-align:center;margin-top:40px;padding:16px 0;
         border-top:1px solid var(--border)">
         <p style="font-size:11px;color:var(--muted);opacity:.6;line-height:1.8">
-          호필 스튜디오 v0.4.17 beta · © 2026 호백<br>
+          호필 스튜디오 v0.4.19 beta · © 2026 호백<br>
           <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank"
             style="color:var(--muted);text-decoration:none;opacity:.8">CC BY-NC 4.0</a>
           · 비상업적 목적에 한해 자유롭게 사용 가능<br>
@@ -3143,7 +3236,9 @@ function renderCharRelationTab(idx) {
           <option value="">— 없음 —</option>
           ${families.map(f => `<option value="${f.id}" ${c.familyId===f.id?'selected':''}>${esc(f.name)}</option>`).join('')}
         </select>
-        ${families.length===0?'<div style="font-size:11px;color:var(--muted);margin-top:4px">아직 가문이 없습니다. "가문" 탭에서 먼저 만들어보세요.</div>':''}
+        ${families.length===0
+          ? '<div style="font-size:11px;color:var(--muted);margin-top:4px">아직 가문이 없습니다. "가문" 탭에서 먼저 만들어보세요.</div>'
+          : '<div style="font-size:11px;color:var(--gold);margin-top:4px">🔗 선택하면 해당 가문 구성원으로 자동 등록됩니다.</div>'}
       </div>
 
       <div>
@@ -3184,7 +3279,28 @@ function setCrFamily(idx, familyId) {
   const p = getProject();
   const c = p.characters[idx];
   if (!c) return;
-  c.familyId = familyId || '';
+  const oldFamilyId = c.familyId || '';
+  const newFamilyId = familyId || '';
+  if (oldFamilyId === newFamilyId) return;
+
+  // 이전 가문에서 이 인물 제거 (charId 기반)
+  if (oldFamilyId) {
+    const oldFam = (p.families || []).find(f => f.id === oldFamilyId);
+    if (oldFam && oldFam.groups) {
+      Object.keys(oldFam.groups).forEach(tab => {
+        const list = oldFam.groups[tab];
+        if (!Array.isArray(list)) return;
+        oldFam.groups[tab] = list.filter(m => !(m && m.charId === c.id));
+      });
+    }
+  }
+
+  c.familyId = newFamilyId;
+
+  // 새 가문에 자동 추가 (charId 연결 포함)
+  if (newFamilyId) {
+    addCharToFamily(p, c.id, newFamilyId);
+  }
   autoSave();
 }
 
@@ -3316,6 +3432,24 @@ function saveChar(idx) {
   const p = getProject();
   if (idx !== undefined) p.characters[idx] = c;
   else p.characters.push(c);
+  // 이 인물과 연결된 가문 멤버(들)의 이름/나이/성별/생사 동기화
+  if (c.id && Array.isArray(p.families)) {
+    p.families.forEach(f => {
+      if (!f || !f.groups) return;
+      Object.keys(f.groups).forEach(tab => {
+        const list = f.groups[tab];
+        if (!Array.isArray(list)) return;
+        list.forEach(m => {
+          if (m && m.charId === c.id) {
+            m.name = c.name;
+            m.age = c.age;
+            m.gender = c.gender;
+            m.alive = c.alive;
+          }
+        });
+      });
+    });
+  }
   autoSave(); closeModal();
   // 참고 패널이 열려있으면 패널만 갱신, 아니면 현재 탭을 재렌더
   const splitPanel = document.getElementById('split-panel');
@@ -3890,7 +4024,32 @@ function renderChapters() {
   // 폴더 접힘 상태
   if (!window._folderCollapsed) window._folderCollapsed = {};
 
+  // 화 ID → 연결된 심리 단계 목록 (인물별)
+  const psyByChapter = new Map(); // chapterId → [{emotion, charName, charColor, title}]
+  (p.psyArcs || []).forEach(arc => {
+    const charColor = arc.charName ? getCharColor(arc.charName, p) : 'var(--gold)';
+    (arc.steps || []).forEach(s => {
+      if (!s.chapterId) return;
+      if (!psyByChapter.has(s.chapterId)) psyByChapter.set(s.chapterId, []);
+      psyByChapter.get(s.chapterId).push({
+        emotion: s.emotion,
+        charName: arc.charName || '',
+        charColor,
+        title: s.title || '',
+      });
+    });
+  });
+
   function chapterItem(c) {
+    const psyList = psyByChapter.get(c.id) || [];
+    // 한 화에 여러 인물의 심리 변화가 있을 수 있으니 인물별로 작은 점을 나열
+    const psyBadge = psyList.length > 0
+      ? `<span title="${esc(psyList.map(x => `${PSY_EMOTION_ICONS[x.emotion]||'💭'} ${x.charName?x.charName+': ':''}${x.title}`).join('\n'))}"
+              style="display:inline-flex;align-items:center;gap:1px;flex-shrink:0">
+           ${psyList.slice(0,3).map(x => `<span style="width:7px;height:7px;border-radius:50%;background:${x.charColor};display:inline-block"></span>`).join('')}
+           <span style="font-size:9px;margin-left:1px">💭</span>
+         </span>`
+      : '';
     return `
       <div class="chapter-item ch-drag-item ${c.id===activeChapterId?'active':''}"
         data-chid="${c.id}" data-folderid="${c.folderId||''}"
@@ -3900,7 +4059,10 @@ function renderChapters() {
             style="color:var(--border);font-size:13px;cursor:grab;flex-shrink:0;
               touch-action:none;user-select:none;padding:0 2px">⠿</span>
           <div style="flex:1;min-width:0">
-            <div class="chapter-item-title">${esc(c.title)}</div>
+            <div class="chapter-item-title" style="display:flex;align-items:center;gap:5px">
+              <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.title)}</span>
+              ${psyBadge}
+            </div>
             ${c.summary ? `<div class="ch-summary-tip" style="font-size:10px;color:var(--muted);margin-bottom:2px;
               overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
               font-style:italic;line-height:1.4;cursor:default"
@@ -4720,6 +4882,10 @@ function deleteChapter(id) {
   p.chapters = p.chapters.filter(c => c.id !== id);
   // 사건 일지 고아 참조 정리
   (p.chronicles || []).forEach(ev => { if (ev.chapterId === id) ev.chapterId = ''; });
+  // 심리 아크 단계 고아 참조 정리 (연결만 끊고 trigger 텍스트는 유지)
+  (p.psyArcs || []).forEach(arc => {
+    (arc.steps || []).forEach(s => { if (s.chapterId === id) s.chapterId = ''; });
+  });
   if (activeChapterId === id) activeChapterId = p.chapters[0]?.id || null;
   autoSave(); renderChapters();
   });
@@ -8171,6 +8337,7 @@ function getFamilyTabNames(f) {
 }
 
 function renderFamilyTabs(f, fi) {
+  const p = getProject();
   const tabs = getFamilyTabNames(f);
   const groups = f.groups || {};
   const activeTab = familyActiveTab['f'+fi] || tabs[0];
@@ -8189,15 +8356,21 @@ function renderFamilyTabs(f, fi) {
     </button>`;
   }).join('');
 
-  const memberRows = members.map((m, mi) => `
+  const memberRows = members.map((m, mi) => {
+    const linked = !!(m.charId && (p.characters || []).some(x => x.id === m.charId));
+    const linkBadge = linked
+      ? `<span title="등장인물 수정으로 이동" style="font-size:10px;color:var(--gold);font-weight:700;padding:1px 5px;border-radius:6px;background:var(--gold-light);border:1px solid var(--gold);cursor:pointer" onclick="event.stopPropagation();openCharFromMember('${esc(m.charId)}')">🔗 인물 수정</span>`
+      : '';
+    return `
     <div class="member-row" data-fi="${fi}" data-mi="${mi}"
-      style="display:flex;align-items:flex-start;gap:8px;padding:6px 10px;background:var(--cream);border-radius:8px;transition:opacity .15s">
+      style="display:flex;align-items:flex-start;gap:8px;padding:6px 10px;background:var(--cream);border-radius:8px;transition:opacity .15s${linked?';border:1px solid var(--gold-light)':''}">
       <span class="member-handle" data-fi="${fi}" data-mi="${mi}"
         style="color:var(--muted);font-size:18px;flex-shrink:0;cursor:grab;padding:4px;touch-action:none;user-select:none;margin-top:1px">⠿</span>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span style="font-weight:600;font-size:13px">${esc(m.name)}</span>
           ${m.relation?`<span style="font-size:11px;color:var(--muted)">${esc(m.relation)}</span>`:''}
+          ${linkBadge}
         </div>
         ${m.note?`<div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5;word-break:break-all">${esc(m.note)}</div>`:''}
       </div>
@@ -8205,7 +8378,8 @@ function renderFamilyTabs(f, fi) {
         <button onclick="showEditMemberModal(${fi},${mi})" style="background:none;border:none;cursor:pointer;color:var(--teal);font-size:13px;width:28px;height:28px">✏️</button>
         <button onclick="deleteFamilyMember(${fi},${mi})" style="background:none;border:none;cursor:pointer;color:var(--rust);font-size:14px;width:28px;height:28px">×</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   return `
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
@@ -8224,6 +8398,75 @@ let familyActiveTab = {};
 function setFamilyTab(fi, tab) {
   familyActiveTab['f'+fi] = tab;
   renderFamily();
+}
+
+/** 가문 멤버에서 연결된 등장인물 편집 화면으로 이동 */
+function openCharFromMember(charId) {
+  if (!charId) return;
+  const p = getProject();
+  const idx = (p.characters || []).findIndex(c => c.id === charId);
+  if (idx === -1) {
+    toast('연결된 인물을 찾을 수 없어요.');
+    return;
+  }
+  // 기존 모달 닫고 인물 편집 모달 열기
+  if (typeof closeModal === 'function') closeModal();
+  showCharModal(idx, 'basic');
+}
+
+/** 멤버 수정 모달에서 등장인물과 새로 연결 */
+function linkMemberToChar(fi, mi) {
+  const sel = document.getElementById('mb-link-sel');
+  const charId = sel?.value;
+  if (!charId) { toast('인물을 선택해주세요.'); return; }
+  const p = getProject();
+  const f = p.families[fi];
+  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+  const m = f.groups?.[tab]?.[mi];
+  if (!m) return;
+  const c = (p.characters || []).find(x => x.id === charId);
+  if (!c) return;
+  // 다른 가문에 속해 있었다면 그쪽에서 charId 멤버 제거
+  if (c.familyId && c.familyId !== f.id) {
+    const old = (p.families || []).find(x => x.id === c.familyId);
+    if (old && old.groups) {
+      Object.keys(old.groups).forEach(t => {
+        const list = old.groups[t];
+        if (Array.isArray(list)) old.groups[t] = list.filter(mm => !(mm && mm.charId === c.id));
+      });
+    }
+  }
+  m.charId = c.id;
+  // 인물 정보로 폼 갱신 (이름/나이 등 등장인물 우선)
+  m.name   = c.name   || m.name;
+  m.age    = c.age    || m.age;
+  m.gender = c.gender || m.gender;
+  m.alive  = c.alive  || m.alive;
+  c.familyId = f.id;
+  autoSave();
+  closeModal();
+  renderFamily();
+  toast('등장인물과 연결했어요.');
+}
+
+/** 멤버 수정 모달에서 등장인물 연결 해제 */
+function unlinkMemberFromChar(fi, mi) {
+  const p = getProject();
+  const f = p.families[fi];
+  const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
+  const m = f.groups?.[tab]?.[mi];
+  if (!m) return;
+  const oldCharId = m.charId;
+  m.charId = '';
+  // 인물의 familyId 가 이 가문이었다면 비움
+  if (oldCharId) {
+    const c = (p.characters || []).find(x => x.id === oldCharId);
+    if (c && c.familyId === f.id) c.familyId = '';
+  }
+  autoSave();
+  closeModal();
+  renderFamily();
+  toast('연결을 해제했어요.');
 }
 
 
@@ -11347,6 +11590,10 @@ function deleteItem(id) {
 function renderPsyArc() {
   const p = getProject();
   const arcs = p.psyArcs || [];
+  // 화 ID → {번호, 제목} 맵
+  const chList = (p.chapters || []).filter(c => !c.isFolder);
+  const chapterById = new Map();
+  chList.forEach((c, i) => chapterById.set(c.id, { num: i + 1, title: c.title }));
 
   const cols = arcs.map((arc, ai) => {
     const steps = arc.steps || [];
@@ -11373,7 +11620,17 @@ function renderPsyArc() {
           ? `<div style="text-align:center;padding:20px 10px;color:var(--muted);font-size:12px">변화 단계를 추가해보세요</div>`
           : `<div class="psy-step-list" data-ai="${ai}" style="position:relative;padding-left:20px">
               <div style="position:absolute;left:10px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,${charColor},var(--teal2));border-radius:2px;opacity:.5"></div>
-              ${steps.map((s, si) => `
+              ${steps.map((s, si) => {
+                const linkedCh = s.chapterId ? chapterById.get(s.chapterId) : null;
+                const chapterLine = linkedCh
+                  ? `<div style="font-size:10px;color:var(--gold);margin-bottom:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+                       <span style="cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();gotoChapterFromPsy('${esc(s.chapterId)}')" title="이 화로 이동">🔗 ${linkedCh.num}화 · ${esc(linkedCh.title)}</span>
+                     </div>`
+                  : (s.trigger ? `<div style="font-size:10px;color:var(--teal);margin-bottom:3px">← ${esc(s.trigger)}</div>` : '');
+                const memoLine = (linkedCh && s.trigger)
+                  ? `<div style="font-size:10px;color:var(--muted);margin-bottom:3px;font-style:italic">← ${esc(s.trigger)}</div>`
+                  : '';
+                return `
                 <div class="psy-step-row" data-ai="${ai}" data-si="${si}" style="position:relative;margin-bottom:10px">
                   <div style="position:absolute;left:-14px;top:8px;width:10px;height:10px;border-radius:50%;
                     background:${PSY_EMOTION_COLORS[s.emotion]||charColor};
@@ -11388,14 +11645,16 @@ function renderPsyArc() {
                           <span style="font-size:14px">${PSY_EMOTION_ICONS[s.emotion]||'💭'}</span>
                           <span style="font-weight:700;font-size:12px;word-break:break-all">${esc(s.title)}</span>
                         </div>
-                        ${s.trigger ? `<div style="font-size:10px;color:var(--teal);margin-bottom:3px">← ${esc(s.trigger)}</div>` : ''}
+                        ${chapterLine}
+                        ${memoLine}
                         ${s.content ? `<div style="font-size:11px;color:var(--muted);line-height:1.6;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(s.content)}</div>` : ''}
                       </div>
                       <button onclick="event.stopPropagation();deletePsyStep(${ai},${si})"
                         style="background:none;border:none;cursor:pointer;color:var(--rust);font-size:13px;font-weight:700;flex-shrink:0;padding:0">×</button>
                     </div>
                   </div>
-                </div>`).join('')}
+                </div>`;
+              }).join('')}
             </div>`}
 
         <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center;margin-top:6px" onclick="showPsyStepModal(${ai})">
@@ -11577,11 +11836,24 @@ function showPsyStepModal(ai, si) {
   const s = si !== undefined ? (p.psyArcs[ai].steps||[])[si] : {};
   const emotionOpts = Object.keys(PSY_EMOTION_ICONS).map(e =>
     `<option value="${e}" ${s.emotion===e?'selected':''}>${PSY_EMOTION_ICONS[e]} ${e}</option>`).join('');
+  const chapters = (p.chapters || []).filter(c => !c.isFolder);
+  const chapterOpts = chapters.map((c, i) => {
+    const num = i + 1;
+    return `<option value="${c.id}" ${s.chapterId===c.id?'selected':''}>${num}화 · ${esc(c.title)}</option>`;
+  }).join('');
   showModal(`
     <div class="modal-title">${si !== undefined ? '단계 수정' : '변화 단계 추가'}</div>
     <div style="margin-bottom:12px"><label class="label">단계 제목 *</label><input id="ps-title" value="${esc(s.title||'')}" placeholder="예: 배신으로 인한 분노, 진실을 깨닫다"></div>
     <div style="margin-bottom:12px"><label class="label">감정/상태</label><select id="ps-emotion">${emotionOpts}</select></div>
-    <div style="margin-bottom:12px"><label class="label">계기 (어떤 사건이 이 변화를 일으켰나요?)</label><input id="ps-trigger" value="${esc(s.trigger||'')}" placeholder="예: 3장 - 스승의 죽음"></div>
+    <div style="margin-bottom:12px">
+      <label class="label">연결된 화 <span style="font-size:10px;color:var(--gold)">🔗 자동 동기화</span></label>
+      <select id="ps-chapter" style="width:100%">
+        <option value="">— 연결 안 함 —</option>
+        ${chapterOpts}
+      </select>
+      ${chapters.length === 0 ? '<div style="font-size:11px;color:var(--muted);margin-top:4px">아직 작성된 화가 없습니다.</div>' : ''}
+    </div>
+    <div style="margin-bottom:12px"><label class="label">계기 (보조 메모)</label><input id="ps-trigger" value="${esc(s.trigger||'')}" placeholder="예: 스승의 죽음 — 화와 별개로 자유롭게 적어도 됩니다"></div>
     <div style="margin-bottom:20px"><label class="label">내면 묘사</label><textarea id="ps-content" rows="4" placeholder="이 시점 인물의 생각, 가치관, 감정을 자세히 기록하세요">${esc(s.content||'')}</textarea></div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal()">취소</button>
@@ -11599,6 +11871,7 @@ function savePsyStep(ai, si) {
     id: si !== undefined ? p.psyArcs[ai].steps[si].id : uid(),
     title,
     emotion: document.getElementById('ps-emotion').value,
+    chapterId: document.getElementById('ps-chapter')?.value || '',
     trigger: document.getElementById('ps-trigger').value,
     content: document.getElementById('ps-content').value,
   };
@@ -11610,6 +11883,17 @@ function savePsyStep(ai, si) {
 function deletePsyStep(ai, si) {
   getProject().psyArcs[ai].steps.splice(si, 1);
   autoSave(); renderPsyArc();
+}
+
+/** 심리 단계 카드의 화 링크 클릭 → 집필 편집기로 이동 + 해당 화 활성화 */
+function gotoChapterFromPsy(chapterId) {
+  if (!chapterId) return;
+  const p = getProject();
+  const ch = (p.chapters || []).find(c => c.id === chapterId);
+  if (!ch) { toast('연결된 화를 찾을 수 없어요.'); return; }
+  activeChapterId = chapterId;
+  if (typeof navigate === 'function') navigate('chapters');
+  else if (typeof renderChapters === 'function') renderChapters();
 }
 
 function renderFamily() {
@@ -11806,16 +12090,27 @@ function showAddMemberModal(fi) {
   const f = p.families[fi];
   const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
   const chars = p.characters || [];
+  // 이미 이 가문 어딘가에 (charId 로) 등록된 인물은 제외
+  const alreadyIn = new Set();
+  Object.values(f.groups || {}).forEach(list => {
+    if (Array.isArray(list)) list.forEach(m => { if (m && m.charId) alreadyIn.add(m.charId); });
+  });
+  const availableChars = chars.filter(c => !alreadyIn.has(c.id));
   showModal(`
     <div class="modal-title">${tab} 구성원 추가</div>
-    ${chars.length > 0 ? `
+    ${availableChars.length > 0 ? `
     <div style="margin-bottom:14px;padding:10px 12px;background:var(--cream);border-radius:8px;border:1px solid var(--border)">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">등장인물에서 불러오기</div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">등장인물에서 불러오기 <span style="color:var(--gold)">🔗</span></div>
       <select onchange="fillMemberFromChar(this)" style="width:100%;font-size:13px">
-        <option value="">— 인물 선택 —</option>
-        ${chars.map(c => `<option value="${esc(c.name)}|${esc(c.age||'')}|${esc(c.gender||'')}|${esc(c.alive||'생존')}">${esc(c.name)}${c.role?` (${esc(c.role)})`:''}</option>`).join('')}
+        <option value="">— 인물 선택 (자동 연결) —</option>
+        ${availableChars.map(c => `<option value="${esc(c.id)}">${esc(c.name)}${c.role?` (${esc(c.role)})`:''}</option>`).join('')}
       </select>
-    </div>` : ''}
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">선택한 인물은 등장인물·가계도와 자동으로 연결됩니다.</div>
+    </div>` : (chars.length > 0 ? `
+    <div style="margin-bottom:14px;padding:8px 12px;background:var(--cream);border-radius:8px;border:1px solid var(--border);font-size:11px;color:var(--muted)">
+      모든 등장인물이 이미 이 가문에 등록되어 있습니다.
+    </div>` : '')}
+    <input type="hidden" id="mb-charid" value="">
     <div class="form-grid">
       <div class="full"><label class="label">이름 *</label>
         <input id="mb-name" placeholder="예: 아르켄 레온하르트"></div>
@@ -11848,24 +12143,28 @@ function showAddMemberModal(fi) {
 }
 
 function fillMemberFromChar(sel) {
-  const val = sel.value;
-  if (!val) return;
-  const [name, age, gender, alive] = val.split('|');
-  const nameEl = document.getElementById('mb-name');
-  const ageEl  = document.getElementById('mb-age');
-  const genEl  = document.getElementById('mb-gender');
-  const alvEl  = document.getElementById('mb-alive');
-  if (nameEl) nameEl.value = name;
-  if (ageEl)  ageEl.value  = age;
+  const charId = sel.value;
+  if (!charId) return;
+  const p = getProject();
+  const c = (p.characters || []).find(x => x.id === charId);
+  if (!c) return;
+  const idEl    = document.getElementById('mb-charid');
+  const nameEl  = document.getElementById('mb-name');
+  const ageEl   = document.getElementById('mb-age');
+  const genEl   = document.getElementById('mb-gender');
+  const alvEl   = document.getElementById('mb-alive');
+  if (idEl)   idEl.value   = c.id;
+  if (nameEl) nameEl.value = c.name || '';
+  if (ageEl)  ageEl.value  = c.age || '';
   if (genEl) {
     const map = {'남':'남','남성':'남','여':'여','여성':'여','기타':'기타'};
-    genEl.value = map[gender] || '';
+    genEl.value = map[c.gender] || '';
   }
   if (alvEl) {
     const map = {'생존':'생존','사망':'사망','불명':'불명','불사':'불사','불사/불멸':'불사'};
-    alvEl.value = map[alive] || '생존';
+    alvEl.value = map[c.alive] || '생존';
   }
-  sel.value = ''; // 선택 초기화
+  sel.value = '';
   document.getElementById('mb-relation')?.focus();
 }
 
@@ -11875,8 +12174,44 @@ function showEditMemberModal(fi, mi) {
   const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
   const m = (f.groups && f.groups[tab]) ? f.groups[tab][mi] : null;
   if (!m) return;
+
+  const linkedChar = m.charId ? (p.characters || []).find(x => x.id === m.charId) : null;
+  // 이 가문에 이미 연결돼 있는 charId 들 (자기 자신은 제외)
+  const usedIds = new Set();
+  Object.values(f.groups || {}).forEach(list => {
+    if (Array.isArray(list)) list.forEach(mm => {
+      if (mm && mm.charId && mm !== m) usedIds.add(mm.charId);
+    });
+  });
+  const availableChars = (p.characters || []).filter(c => !usedIds.has(c.id));
+
+  const linkBlock = linkedChar
+    ? `<div style="margin-bottom:14px;padding:10px 12px;background:var(--gold-light);border-radius:8px;border:1px solid var(--gold);font-size:12px">
+         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+           <div>🔗 <b>${esc(linkedChar.name)}</b> (등장인물)와 연결됨</div>
+           <div style="display:flex;gap:6px">
+             <button class="btn btn-outline btn-sm" onclick="openCharFromMember('${esc(linkedChar.id)}')">인물 편집</button>
+             <button class="btn btn-outline btn-sm" onclick="unlinkMemberFromChar(${fi},${mi})" style="color:var(--rust);border-color:var(--rust)">연결 해제</button>
+           </div>
+         </div>
+       </div>`
+    : (availableChars.length > 0
+      ? `<div style="margin-bottom:14px;padding:10px 12px;background:var(--cream);border-radius:8px;border:1px solid var(--border)">
+           <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px">등장인물과 연결</div>
+           <div style="display:flex;gap:6px">
+             <select id="mb-link-sel" style="flex:1;font-size:13px">
+               <option value="">— 인물 선택 —</option>
+               ${availableChars.map(c => `<option value="${esc(c.id)}">${esc(c.name)}${c.role?` (${esc(c.role)})`:''}</option>`).join('')}
+             </select>
+             <button class="btn btn-outline btn-sm" onclick="linkMemberToChar(${fi},${mi})">연결</button>
+           </div>
+         </div>`
+      : '');
+
   showModal(`
     <div class="modal-title">구성원 수정</div>
+    ${linkBlock}
+    <input type="hidden" id="mb-charid" value="${esc(m.charId||'')}">
     <div class="form-grid">
       <div class="full"><label class="label">이름 *</label>
         <input id="mb-name" value="${esc(m.name||'')}" placeholder="예: 아르켄 레온하르트"></div>
@@ -11915,8 +12250,9 @@ function updateFamilyMember(fi, mi) {
   const f = p.families[fi];
   const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
   if (!f.groups || !f.groups[tab]) return;
-  f.groups[tab][mi] = {
-    ...f.groups[tab][mi],
+  const prev = f.groups[tab][mi] || {};
+  const updated = {
+    ...prev,
     name,
     age: document.getElementById('mb-age')?.value || '',
     gender: document.getElementById('mb-gender')?.value || '',
@@ -11924,6 +12260,19 @@ function updateFamilyMember(fi, mi) {
     relation: document.getElementById('mb-relation').value,
     note: document.getElementById('mb-note').value,
   };
+  f.groups[tab][mi] = updated;
+  // 등장인물과 연결되어 있으면 기본 정보도 함께 갱신 (관계/직위·비고는 가문 전용이므로 유지)
+  if (updated.charId) {
+    const c = (p.characters || []).find(x => x.id === updated.charId);
+    if (c) {
+      c.name   = updated.name;
+      c.age    = updated.age;
+      c.gender = updated.gender;
+      c.alive  = updated.alive;
+      // familyId 가 다른 곳을 가리키고 있다면 정정
+      if (c.familyId !== f.id) c.familyId = f.id;
+    }
+  }
   autoSave(); closeModal(); renderFamily();
   toast('수정했습니다.');
 }
@@ -11936,7 +12285,9 @@ function saveFamilyMember(fi) {
   const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
   if (!f.groups) f.groups = {};
   if (!f.groups[tab]) f.groups[tab] = [];
+  const charId = (document.getElementById('mb-charid')?.value || '').trim();
   f.groups[tab].push({
+    charId: charId || '',
     name,
     age: document.getElementById('mb-age')?.value || '',
     gender: document.getElementById('mb-gender')?.value || '',
@@ -11944,6 +12295,23 @@ function saveFamilyMember(fi) {
     relation: document.getElementById('mb-relation').value,
     note: document.getElementById('mb-note').value,
   });
+  // 등장인물과 연결된 경우, 해당 인물의 familyId 도 동기화
+  if (charId) {
+    const c = (p.characters || []).find(x => x.id === charId);
+    if (c) {
+      // 다른 가문에 이미 속해 있었다면 그쪽에서는 charId 멤버 제거
+      if (c.familyId && c.familyId !== f.id) {
+        const old = (p.families || []).find(x => x.id === c.familyId);
+        if (old && old.groups) {
+          Object.keys(old.groups).forEach(t => {
+            const list = old.groups[t];
+            if (Array.isArray(list)) old.groups[t] = list.filter(m => !(m && m.charId === c.id));
+          });
+        }
+      }
+      c.familyId = f.id;
+    }
+  }
   autoSave(); closeModal(); renderFamily();
 }
 
@@ -11952,7 +12320,13 @@ function deleteFamilyMember(fi, mi) {
   const f = p.families[fi];
   const tab = familyActiveTab['f'+fi] || getFamilyTabNames(f)[0];
   if (f.groups && f.groups[tab]) {
+    const removed = f.groups[tab][mi];
     f.groups[tab].splice(mi, 1);
+    // 연결된 인물이 있다면 그 인물의 familyId 도 비움 (양방향 동기화)
+    if (removed && removed.charId) {
+      const c = (p.characters || []).find(x => x.id === removed.charId);
+      if (c && c.familyId === f.id) c.familyId = '';
+    }
   }
   autoSave(); renderFamily();
   toast('구성원을 삭제했어요.');
